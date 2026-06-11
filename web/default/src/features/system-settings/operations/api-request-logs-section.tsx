@@ -38,7 +38,7 @@ import {
 import { Eye, RefreshCw } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
-import { formatTimestampToDate, formatUseTime } from '@/lib/format'
+import { formatBytes, formatTimestampToDate, formatUseTime } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard'
 import { Button } from '@/components/ui/button'
@@ -73,12 +73,14 @@ import type { ApiRequestLog, GetApiRequestLogsParams } from '../types'
 
 const apiRequestLogSettingsSchema = z.object({
   ApiRequestLogBodySizeKB: z.number().int().min(0),
+  ApiRequestLogRequestCompactionLimitMB: z.number().int().min(0),
 })
 
 type ApiRequestLogSettingsValues = z.infer<typeof apiRequestLogSettingsSchema>
 
 type ApiRequestLogsSectionProps = {
   defaultBodySizeKB: number
+  defaultRequestCompactionLimitMB: number
 }
 
 type ApiRequestLogFilterValues = {
@@ -153,20 +155,41 @@ function hasActiveFilters(filters: ApiRequestLogFilterValues) {
   )
 }
 
-function BodyBlock(props: { title: string; body: string; truncated: boolean }) {
+function BodyBlock(props: {
+  title: string
+  body: string
+  truncated: boolean
+  compactionFailed: boolean
+}) {
   const { t } = useTranslation()
   const { copyToClipboard } = useCopyToClipboard()
   const body = props.body || ''
+  const bodySize =
+    typeof TextEncoder === 'undefined'
+      ? body.length
+      : new TextEncoder().encode(body).length
 
   return (
     <div className='flex min-w-0 flex-col gap-2'>
       <div className='flex min-w-0 items-center justify-between gap-2'>
         <div className='flex min-w-0 items-center gap-2'>
           <h4 className='text-sm font-medium'>{props.title}</h4>
+          <StatusBadge
+            label={formatBytes(bodySize)}
+            variant='neutral'
+            copyable={false}
+          />
           {props.truncated && (
             <StatusBadge
               label={t('Truncated')}
               variant='warning'
+              copyable={false}
+            />
+          )}
+          {props.compactionFailed && (
+            <StatusBadge
+              label={t('Compaction failed')}
+              variant='danger'
               copyable={false}
             />
           )}
@@ -282,11 +305,13 @@ function ApiRequestLogDetailDialog(props: {
               title={t('Request Body')}
               body={log.request_body}
               truncated={Boolean(log.request_truncated)}
+              compactionFailed={Boolean(log.request_compaction_failed)}
             />
             <BodyBlock
               title={t('Response Body')}
               body={log.response_body}
               truncated={Boolean(log.response_truncated)}
+              compactionFailed={Boolean(log.response_compaction_failed)}
             />
           </div>
         </div>
@@ -302,6 +327,8 @@ export function ApiRequestLogsSection(props: ApiRequestLogsSectionProps) {
     resolver: zodResolver(apiRequestLogSettingsSchema),
     defaultValues: {
       ApiRequestLogBodySizeKB: props.defaultBodySizeKB,
+      ApiRequestLogRequestCompactionLimitMB:
+        props.defaultRequestCompactionLimitMB,
     },
   })
   const [pagination, setPagination] = useState<PaginationState>({
@@ -339,15 +366,35 @@ export function ApiRequestLogsSection(props: ApiRequestLogsSectionProps) {
   useEffect(() => {
     settingsForm.reset({
       ApiRequestLogBodySizeKB: props.defaultBodySizeKB,
+      ApiRequestLogRequestCompactionLimitMB:
+        props.defaultRequestCompactionLimitMB,
     })
-  }, [props.defaultBodySizeKB, settingsForm])
+  }, [
+    props.defaultBodySizeKB,
+    props.defaultRequestCompactionLimitMB,
+    settingsForm,
+  ])
 
   const handleSettingsSubmit = async (values: ApiRequestLogSettingsValues) => {
-    if (values.ApiRequestLogBodySizeKB === props.defaultBodySizeKB) return
-    await updateOption.mutateAsync({
-      key: 'ApiRequestLogBodySizeKB',
-      value: values.ApiRequestLogBodySizeKB,
-    })
+    const updates: Array<{ key: string; value: number }> = []
+    if (values.ApiRequestLogBodySizeKB !== props.defaultBodySizeKB) {
+      updates.push({
+        key: 'ApiRequestLogBodySizeKB',
+        value: values.ApiRequestLogBodySizeKB,
+      })
+    }
+    if (
+      values.ApiRequestLogRequestCompactionLimitMB !==
+      props.defaultRequestCompactionLimitMB
+    ) {
+      updates.push({
+        key: 'ApiRequestLogRequestCompactionLimitMB',
+        value: values.ApiRequestLogRequestCompactionLimitMB,
+      })
+    }
+    for (const update of updates) {
+      await updateOption.mutateAsync(update)
+    }
   }
 
   const columns = useMemo<ColumnDef<ApiRequestLog>[]>(
@@ -716,6 +763,38 @@ export function ApiRequestLogsSection(props: ApiRequestLogsSectionProps) {
                   <FormDescription>
                     {t(
                       'Maximum request and response body size saved per usage log, in KB. Set 0 to save only the association without body content.'
+                    )}
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={settingsForm.control}
+              name='ApiRequestLogRequestCompactionLimitMB'
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>
+                    {t('API request log request compaction limit')}
+                  </FormLabel>
+                  <FormControl>
+                    <Input
+                      type='number'
+                      min={0}
+                      step={1}
+                      value={field.value}
+                      onChange={(event) =>
+                        field.onChange(
+                          event.target.value === ''
+                            ? 0
+                            : Number(event.target.value)
+                        )
+                      }
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    {t(
+                      'Maximum request body size read for compaction before the saved log body size is applied, in MB. Requests larger than this are marked as compaction failed and then truncated.'
                     )}
                   </FormDescription>
                   <FormMessage />

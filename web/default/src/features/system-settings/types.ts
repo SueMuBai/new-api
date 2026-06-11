@@ -79,6 +79,8 @@ export type ApiRequestLog = {
   response_body: string
   request_truncated?: boolean
   response_truncated?: boolean
+  request_compaction_failed?: boolean
+  response_compaction_failed?: boolean
 }
 
 export type GetApiRequestLogsParams = {
@@ -359,6 +361,7 @@ export type OperationsSettings = {
   WorkerAllowHttpImageRequestEnabled: boolean
   LogConsumeEnabled: boolean
   ApiRequestLogBodySizeKB: number
+  ApiRequestLogRequestCompactionLimitMB: number
   'performance_setting.disk_cache_enabled': boolean
   'performance_setting.disk_cache_threshold_mb': number
   'performance_setting.disk_cache_max_size_mb': number

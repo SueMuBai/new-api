@@ -655,7 +655,8 @@ func SumUsedQuota(
 	for _, row := range rows {
 		stat.CacheTokens += getLogStatCacheTokens(row.Other)
 	}
-	stat.TotalTokens = stat.InputTokens + stat.OutputTokens + stat.CacheTokens
+	// Cache tokens are shown separately; prompt_tokens already includes them for OpenAI-format logs.
+	stat.TotalTokens = stat.InputTokens + stat.OutputTokens
 
 	return stat, nil
 }

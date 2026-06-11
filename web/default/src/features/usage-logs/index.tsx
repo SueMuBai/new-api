@@ -61,6 +61,7 @@ function UsageLogsContent() {
       : USAGE_LOGS_DEFAULT_SECTION
   const {
     selectedUserId,
+    selectedUserToken,
     userInfoDialogOpen,
     setUserInfoDialogOpen,
     affinityTarget,
@@ -134,6 +135,7 @@ function UsageLogsContent() {
 
       <UserInfoDialog
         userId={selectedUserId}
+        currentToken={selectedUserToken}
         open={userInfoDialogOpen}
         onOpenChange={setUserInfoDialogOpen}
       />

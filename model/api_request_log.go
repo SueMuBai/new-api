@@ -16,29 +16,31 @@ type ApiRequestLog struct {
 }
 
 type ApiRequestLogWithUsage struct {
-	ID                int    `json:"id" gorm:"-"`
-	LogID             int    `json:"log_id" gorm:"column:log_id"`
-	CreatedAt         int64  `json:"created_at" gorm:"column:created_at"`
-	RequestBody       string `json:"request_body" gorm:"column:request_body"`
-	ResponseBody      string `json:"response_body" gorm:"column:response_body"`
-	UserId            int    `json:"user_id" gorm:"column:user_id"`
-	Username          string `json:"username" gorm:"column:username"`
-	TokenId           int    `json:"token_id" gorm:"column:token_id"`
-	TokenName         string `json:"token_name" gorm:"column:token_name"`
-	ModelName         string `json:"model_name" gorm:"column:model_name"`
-	ChannelId         int    `json:"channel_id" gorm:"column:channel_id"`
-	Method            string `json:"method" gorm:"-"`
-	Path              string `json:"path" gorm:"-"`
-	Query             string `json:"query" gorm:"-"`
-	StatusCode        int    `json:"status_code" gorm:"-"`
-	Ip                string `json:"ip" gorm:"column:ip"`
-	UseTime           int    `json:"use_time" gorm:"column:use_time"`
-	IsStream          bool   `json:"is_stream" gorm:"column:is_stream"`
-	RequestId         string `json:"request_id,omitempty" gorm:"column:request_id"`
-	UpstreamRequestId string `json:"upstream_request_id,omitempty" gorm:"column:upstream_request_id"`
-	Other             string `json:"-" gorm:"column:other"`
-	RequestTruncated  bool   `json:"request_truncated" gorm:"-"`
-	ResponseTruncated bool   `json:"response_truncated" gorm:"-"`
+	ID                       int    `json:"id" gorm:"-"`
+	LogID                    int    `json:"log_id" gorm:"column:log_id"`
+	CreatedAt                int64  `json:"created_at" gorm:"column:created_at"`
+	RequestBody              string `json:"request_body" gorm:"column:request_body"`
+	ResponseBody             string `json:"response_body" gorm:"column:response_body"`
+	UserId                   int    `json:"user_id" gorm:"column:user_id"`
+	Username                 string `json:"username" gorm:"column:username"`
+	TokenId                  int    `json:"token_id" gorm:"column:token_id"`
+	TokenName                string `json:"token_name" gorm:"column:token_name"`
+	ModelName                string `json:"model_name" gorm:"column:model_name"`
+	ChannelId                int    `json:"channel_id" gorm:"column:channel_id"`
+	Method                   string `json:"method" gorm:"-"`
+	Path                     string `json:"path" gorm:"-"`
+	Query                    string `json:"query" gorm:"-"`
+	StatusCode               int    `json:"status_code" gorm:"-"`
+	Ip                       string `json:"ip" gorm:"column:ip"`
+	UseTime                  int    `json:"use_time" gorm:"column:use_time"`
+	IsStream                 bool   `json:"is_stream" gorm:"column:is_stream"`
+	RequestId                string `json:"request_id,omitempty" gorm:"column:request_id"`
+	UpstreamRequestId        string `json:"upstream_request_id,omitempty" gorm:"column:upstream_request_id"`
+	Other                    string `json:"-" gorm:"column:other"`
+	RequestTruncated         bool   `json:"request_truncated" gorm:"-"`
+	ResponseTruncated        bool   `json:"response_truncated" gorm:"-"`
+	RequestCompactionFailed  bool   `json:"request_compaction_failed" gorm:"-"`
+	ResponseCompactionFailed bool   `json:"response_compaction_failed" gorm:"-"`
 }
 
 type ApiRequestLogQueryParams struct {
@@ -137,6 +139,8 @@ func formatApiRequestLogs(logs []*ApiRequestLogWithUsage) {
 		log.StatusCode = 200
 		log.RequestTruncated = strings.HasSuffix(log.RequestBody, "\n[truncated]")
 		log.ResponseTruncated = strings.HasSuffix(log.ResponseBody, "\n[truncated]")
+		log.RequestCompactionFailed = isApiRequestLogCompactionFailed(log.RequestBody)
+		log.ResponseCompactionFailed = isApiRequestLogCompactionFailed(log.ResponseBody)
 
 		otherMap, _ := common.StrToMap(log.Other)
 		if otherMap == nil {
@@ -146,6 +150,11 @@ func formatApiRequestLogs(logs []*ApiRequestLogWithUsage) {
 			log.Path = path
 		}
 	}
+}
+
+func isApiRequestLogCompactionFailed(body string) bool {
+	return strings.HasPrefix(body, "event: log.compaction_failed\n") ||
+		strings.Contains(body, `"log_compaction_failed":true`)
 }
 
 func GetApiRequestLogs(startIdx int, num int, params ApiRequestLogQueryParams) ([]*ApiRequestLogWithUsage, int64, error) {

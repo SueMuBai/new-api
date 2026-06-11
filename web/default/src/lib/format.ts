@@ -167,13 +167,43 @@ export function formatLogQuota(quota: number): string {
 }
 
 /**
- * Format tokens count with K/M suffixes
+ * Format token count with B/M/K suffixes.
  */
 export function formatTokens(tokens: number): string {
-  if (tokens === 0) return '-'
-  if (tokens < 1000) return tokens.toString()
-  if (tokens < 1000000) return `${(tokens / 1000).toFixed(1)}K`
-  return `${(tokens / 1000000).toFixed(2)}M`
+  if (!Number.isFinite(tokens) || tokens <= 0) return '-'
+  if (tokens >= 1_000_000_000)
+    return `${(tokens / 1_000_000_000).toFixed(
+      tokens >= 10_000_000_000 ? 1 : 2
+    )}B`
+  if (tokens >= 1_000_000)
+    return `${(tokens / 1_000_000).toFixed(
+      tokens >= 10_000_000 ? 1 : 2
+    )}M`
+  if (tokens >= 1_000)
+    return `${(tokens / 1_000).toFixed(tokens >= 10_000 ? 0 : 1)}K`
+  return tokens.toLocaleString()
+}
+
+/**
+ * Format byte size with binary units.
+ */
+export function formatBytes(
+  bytes: number | null | undefined,
+  decimals = 1
+): string {
+  if (bytes == null || Number.isNaN(bytes) || bytes < 0) return '-'
+  if (bytes < 1024) return `${bytes} B`
+
+  const units = ['KB', 'MB', 'GB', 'TB']
+  let value = bytes / 1024
+  let unitIndex = 0
+
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024
+    unitIndex++
+  }
+
+  return `${value.toFixed(value >= 10 ? 0 : decimals)} ${units[unitIndex]}`
 }
 
 /**

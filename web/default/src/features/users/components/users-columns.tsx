@@ -211,7 +211,7 @@ export function useUsersColumns(): ColumnDef<User>[] {
 
               return (
                 <div
-                  className='flex min-w-[120px] items-center gap-2'
+                  className='flex min-w-[64px] items-center'
                   onClick={(event) => event.stopPropagation()}
                 >
                   <Switch
@@ -219,11 +219,6 @@ export function useUsersColumns(): ColumnDef<User>[] {
                     disabled={isUserDeleted(user)}
                     onCheckedChange={handleChange}
                     aria-label={t('Toggle API request logging')}
-                  />
-                  <StatusBadge
-                    label={enabled ? t('Enabled') : t('Disabled')}
-                    variant={enabled ? 'success' : 'neutral'}
-                    copyable={false}
                   />
                 </div>
               )
@@ -305,9 +300,9 @@ export function useUsersColumns(): ColumnDef<User>[] {
         return <GroupBadge group={group} />
       },
       filterFn: (row, id, value) => {
-        const group = String(row.getValue(id) || t('User Group')).toLowerCase()
-        const searchValue = String(value).toLowerCase()
-        return group.includes(searchValue)
+        const selectedGroups = Array.isArray(value) ? value : [value]
+        if (selectedGroups.length === 0) return true
+        return selectedGroups.includes(String(row.getValue(id)))
       },
       meta: { label: t('Group') },
     },

@@ -26,6 +26,7 @@ import {
   formatUseTime,
   formatLogQuota,
   formatTimestampToDate,
+  formatTokens,
 } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
@@ -445,8 +446,12 @@ export function useCommonLogsColumns(isAdmin: boolean): ColumnDef<UsageLog>[] {
           <DataTableColumnHeader column={column} title={t('User')} />
         ),
         cell: function UserCell({ row }) {
-          const { sensitiveVisible, setSelectedUserId, setUserInfoDialogOpen } =
-            useUsageLogsContext()
+          const {
+            sensitiveVisible,
+            setSelectedUserId,
+            setSelectedUserToken,
+            setUserInfoDialogOpen,
+          } = useUsageLogsContext()
           const log = row.original
 
           if (!log.username) return null
@@ -458,6 +463,14 @@ export function useCommonLogsColumns(isAdmin: boolean): ColumnDef<UsageLog>[] {
               onClick={(e) => {
                 e.stopPropagation()
                 setSelectedUserId(log.user_id)
+                setSelectedUserToken(
+                  log.token_id > 0
+                    ? {
+                        tokenId: log.token_id,
+                        tokenName: log.token_name,
+                      }
+                    : null
+                )
                 setUserInfoDialogOpen(true)
               }}
             >
@@ -741,18 +754,18 @@ export function useCommonLogsColumns(isAdmin: boolean): ColumnDef<UsageLog>[] {
         return (
           <div className='flex flex-col gap-0.5'>
             <span className='font-mono text-xs font-medium tabular-nums'>
-              {inputTokens.toLocaleString()} / {outputTokens.toLocaleString()}
+              {formatTokens(inputTokens)} / {formatTokens(outputTokens)}
             </span>
             {(cacheReadTokens > 0 || cacheWriteTokens > 0) && (
               <div className='flex items-center gap-1 text-[11px]'>
                 {cacheReadTokens > 0 && (
                   <span className='text-muted-foreground/60'>
-                    {t('Cache')}↓ {cacheReadTokens.toLocaleString()}
+                    {t('Cache')}↓ {formatTokens(cacheReadTokens)}
                   </span>
                 )}
                 {cacheWriteTokens > 0 && (
                   <span className='text-muted-foreground/60'>
-                    ↑ {cacheWriteTokens.toLocaleString()}
+                    ↑ {formatTokens(cacheWriteTokens)}
                   </span>
                 )}
               </div>

@@ -197,7 +197,7 @@ export function DataTableBulkActions({
         disabled={loadingAction !== null}
       >
         <PowerOff data-icon='inline-start' />
-        {t('Suspend API access')}
+        {t('Suspend')}
       </Button>
       <Button
         variant='outline'
@@ -252,7 +252,7 @@ export function DataTableBulkActions({
       <ConfirmDialog
         open={suspendOpen}
         onOpenChange={setSuspendOpen}
-        title={t("Suspend selected users' API access")}
+        title={t('Suspend selected users')}
         desc={t(
           'Existing tokens for {{count}} selected user(s) will stop working, but their dashboard access remains available.',
           { count: selectedCount }

@@ -110,6 +110,9 @@ const OPERATIONS_SECTIONS = [
     build: (settings: OperationsSettings) => (
       <ApiRequestLogsSection
         defaultBodySizeKB={settings.ApiRequestLogBodySizeKB}
+        defaultRequestCompactionLimitMB={
+          settings.ApiRequestLogRequestCompactionLimitMB
+        }
       />
     ),
   },

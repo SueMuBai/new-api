@@ -130,8 +130,12 @@ export function useTaskLogsColumns(isAdmin: boolean): ColumnDef<TaskLog>[] {
           <DataTableColumnHeader column={column} title={t('User')} />
         ),
         cell: function UserCell({ row }) {
-          const { sensitiveVisible, setSelectedUserId, setUserInfoDialogOpen } =
-            useUsageLogsContext()
+          const {
+            sensitiveVisible,
+            setSelectedUserId,
+            setSelectedUserToken,
+            setUserInfoDialogOpen,
+          } = useUsageLogsContext()
           const log = row.original
           const displayName = log.username || String(log.user_id || '?')
 
@@ -142,6 +146,7 @@ export function useTaskLogsColumns(isAdmin: boolean): ColumnDef<TaskLog>[] {
               onClick={(e) => {
                 e.stopPropagation()
                 setSelectedUserId(log.user_id)
+                setSelectedUserToken(null)
                 setUserInfoDialogOpen(true)
               }}
             >

@@ -49,6 +49,7 @@ func InitOptionMap() {
 	common.OptionMap["AutomaticEnableChannelEnabled"] = strconv.FormatBool(common.AutomaticEnableChannelEnabled)
 	common.OptionMap["LogConsumeEnabled"] = strconv.FormatBool(common.LogConsumeEnabled)
 	common.OptionMap["ApiRequestLogBodySizeKB"] = strconv.Itoa(common.ApiRequestLogBodySizeKB)
+	common.OptionMap["ApiRequestLogRequestCompactionLimitMB"] = strconv.Itoa(common.ApiRequestLogRequestCompactionLimitMB)
 	common.OptionMap["DisplayInCurrencyEnabled"] = strconv.FormatBool(common.DisplayInCurrencyEnabled)
 	common.OptionMap["DisplayTokenStatEnabled"] = strconv.FormatBool(common.DisplayTokenStatEnabled)
 	common.OptionMap["DrawingEnabled"] = strconv.FormatBool(common.DrawingEnabled)
@@ -517,6 +518,8 @@ func updateOptionMap(key string, value string) (err error) {
 		common.RetryTimes, _ = strconv.Atoi(value)
 	case "ApiRequestLogBodySizeKB":
 		common.ApiRequestLogBodySizeKB, _ = strconv.Atoi(value)
+	case "ApiRequestLogRequestCompactionLimitMB":
+		common.ApiRequestLogRequestCompactionLimitMB, _ = strconv.Atoi(value)
 	case "DataExportInterval":
 		common.DataExportInterval, _ = strconv.Atoi(value)
 	case "DataExportDefaultTime":

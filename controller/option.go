@@ -143,7 +143,7 @@ func UpdateOption(c *gin.Context) {
 			common.ApiErrorI18n(c, i18n.MsgPaymentComplianceRequired)
 			return
 		}
-	case "ApiRequestLogBodySizeKB":
+	case "ApiRequestLogBodySizeKB", "ApiRequestLogRequestCompactionLimitMB":
 		intValue, err := strconv.Atoi(strings.TrimSpace(option.Value.(string)))
 		if err != nil || intValue < 0 {
 			common.ApiErrorI18n(c, i18n.MsgInvalidParams)

@@ -43,7 +43,7 @@ import {
   DISABLED_ROW_MOBILE,
   DataTablePage,
 } from '@/components/data-table'
-import { getUsers, searchUsers } from '../api'
+import { getGroups, getUsers, searchUsers } from '../api'
 import {
   ERROR_MESSAGES,
   USER_STATUS,
@@ -101,7 +101,14 @@ export function UsersTable() {
     columnFilters: [
       { columnId: 'status', searchKey: 'status', type: 'array' },
       { columnId: 'role', searchKey: 'role', type: 'array' },
-      { columnId: 'group', searchKey: 'group', type: 'string' },
+      {
+        columnId: 'group',
+        searchKey: 'group',
+        type: 'array',
+        serialize: (value) => (Array.isArray(value) ? value[0] : undefined),
+        deserialize: (value) =>
+          typeof value === 'string' && value.trim() !== '' ? [value] : [],
+      },
     ],
   })
   const statusFilter =
@@ -115,8 +122,11 @@ export function UsersTable() {
   const statusFilterValue = statusFilter[0] ?? ''
   const roleFilterValue = roleFilter[0] ?? ''
   const groupFilter =
-    (columnFilters.find((filter) => filter.id === 'group')?.value as string) ??
-    ''
+    (
+      columnFilters.find((filter) => filter.id === 'group')?.value as
+        | string[]
+        | undefined
+    )?.[0] ?? ''
   const usernameOp =
     (routeSearch.usernameOp as UserTextFilterOperator | undefined) ??
     DEFAULT_USER_TEXT_FILTER_OPERATOR
@@ -139,6 +149,13 @@ export function UsersTable() {
     quotaOp !== DEFAULT_USER_NUMBER_FILTER_OPERATOR
   const searchUsersErrorMessage = t(ERROR_MESSAGES.SEARCH_FAILED)
   const loadUsersErrorMessage = t(ERROR_MESSAGES.LOAD_FAILED)
+
+  const { data: groupsData } = useQuery({
+    queryKey: ['groups'],
+    queryFn: getGroups,
+    staleTime: 5 * 60 * 1000,
+  })
+  const groups = groupsData?.data || []
 
   const advancedFilterValues = useMemo<UsersAdvancedFilterValues>(
     () => ({
@@ -400,6 +417,15 @@ export function UsersTable() {
             columnId: 'role',
             title: t('Role'),
             options: getUserRoleOptions(t),
+            singleSelect: true,
+          },
+          {
+            columnId: 'group',
+            title: t('Group'),
+            options: groups.map((group) => ({
+              label: group,
+              value: group,
+            })),
             singleSelect: true,
           },
         ],

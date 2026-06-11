@@ -45,7 +45,12 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { ConfirmDialog } from '@/components/confirm-dialog'
 import { UserSubscriptionsDialog } from '@/features/subscriptions/components/dialogs/user-subscriptions-dialog'
-import { manageUser, resetUserPasskey, resetUserTwoFA } from '../api'
+import {
+  batchManageUsers,
+  manageUser,
+  resetUserPasskey,
+  resetUserTwoFA,
+} from '../api'
 import {
   USER_STATUS,
   USER_ROLE,
@@ -65,6 +70,8 @@ export function DataTableRowActions({ row }: DataTableRowActionsProps) {
   const { t } = useTranslation()
   const user = row.original
   const { setOpen, setCurrentRow, triggerRefresh } = useUsers()
+  const [deleteTokensOpen, setDeleteTokensOpen] = useState(false)
+  const [isDeletingTokens, setIsDeletingTokens] = useState(false)
   const [resetPasskeyOpen, setResetPasskeyOpen] = useState(false)
   const [resetTwoFAOpen, setResetTwoFAOpen] = useState(false)
   const [bindingDialogOpen, setBindingDialogOpen] = useState(false)
@@ -109,6 +116,27 @@ export function DataTableRowActions({ row }: DataTableRowActionsProps) {
       toast.error(t(ERROR_MESSAGES.UNEXPECTED))
     } finally {
       setResetPasskeyOpen(false)
+    }
+  }
+
+  const handleDeleteTokens = async () => {
+    setIsDeletingTokens(true)
+    try {
+      const result = await batchManageUsers({
+        ids: [user.id],
+        action: 'delete_tokens',
+      })
+      if (result.success && (result.data?.failed_count ?? 0) === 0) {
+        toast.success(t('All tokens deleted'))
+        triggerRefresh()
+      } else {
+        toast.error(result.message || t('Failed to run batch operation'))
+      }
+    } catch (_error) {
+      toast.error(t(ERROR_MESSAGES.UNEXPECTED))
+    } finally {
+      setIsDeletingTokens(false)
+      setDeleteTokensOpen(false)
     }
   }
 
@@ -175,7 +203,7 @@ export function DataTableRowActions({ row }: DataTableRowActionsProps) {
               onClick={() => handleManage('suspend')}
               disabled={isRoot}
             >
-              {t('Suspend API access')}
+              {t('Suspend')}
               <DropdownMenuShortcut>
                 <Ban size={16} />
               </DropdownMenuShortcut>
@@ -241,6 +269,19 @@ export function DataTableRowActions({ row }: DataTableRowActionsProps) {
           <DropdownMenuItem
             onSelect={(event) => {
               event.preventDefault()
+              setDeleteTokensOpen(true)
+            }}
+            disabled={isRoot}
+          >
+            {t('Delete all tokens')}
+            <DropdownMenuShortcut>
+              <Trash2 size={16} />
+            </DropdownMenuShortcut>
+          </DropdownMenuItem>
+
+          <DropdownMenuItem
+            onSelect={(event) => {
+              event.preventDefault()
               setResetPasskeyOpen(true)
             }}
             disabled={isRoot}
@@ -278,6 +319,21 @@ export function DataTableRowActions({ row }: DataTableRowActionsProps) {
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+
+      <ConfirmDialog
+        open={deleteTokensOpen}
+        onOpenChange={setDeleteTokensOpen}
+        title={t('Delete all tokens')}
+        desc={t(
+          "All existing tokens for this user will stop working immediately. The user's dashboard access remains available. Continue?"
+        )}
+        confirmText={
+          isDeletingTokens ? t('Processing...') : t('Delete all tokens')
+        }
+        destructive
+        isLoading={isDeletingTokens}
+        handleConfirm={handleDeleteTokens}
+      />
 
       <ConfirmDialog
         open={resetPasskeyOpen}

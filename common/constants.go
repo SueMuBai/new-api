@@ -114,6 +114,7 @@ var MemoryCacheEnabled bool
 
 var LogConsumeEnabled = true
 var ApiRequestLogBodySizeKB = 64
+var ApiRequestLogRequestCompactionLimitMB = 10
 
 var TLSInsecureSkipVerify bool
 var InsecureTLSConfig = &tls.Config{InsecureSkipVerify: true}

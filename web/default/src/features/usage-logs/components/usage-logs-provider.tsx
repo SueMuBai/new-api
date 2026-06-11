@@ -20,9 +20,16 @@ For commercial licensing, please contact support@quantumnous.com
 import { createContext, useContext, useState, type ReactNode } from 'react'
 import type { ChannelAffinityInfo } from '../types'
 
+export type SelectedUserToken = {
+  tokenId: number
+  tokenName?: string
+}
+
 interface UsageLogsContextValue {
   selectedUserId: number | null
   setSelectedUserId: (userId: number | null) => void
+  selectedUserToken: SelectedUserToken | null
+  setSelectedUserToken: (token: SelectedUserToken | null) => void
   userInfoDialogOpen: boolean
   setUserInfoDialogOpen: (open: boolean) => void
   affinityTarget: ChannelAffinityInfo | null
@@ -39,6 +46,8 @@ const UsageLogsContext = createContext<UsageLogsContextValue | undefined>(
 
 export function UsageLogsProvider({ children }: { children: ReactNode }) {
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null)
+  const [selectedUserToken, setSelectedUserToken] =
+    useState<SelectedUserToken | null>(null)
   const [userInfoDialogOpen, setUserInfoDialogOpen] = useState(false)
   const [affinityTarget, setAffinityTarget] =
     useState<ChannelAffinityInfo | null>(null)
@@ -50,6 +59,8 @@ export function UsageLogsProvider({ children }: { children: ReactNode }) {
       value={{
         selectedUserId,
         setSelectedUserId,
+        selectedUserToken,
+        setSelectedUserToken,
         userInfoDialogOpen,
         setUserInfoDialogOpen,
         affinityTarget,

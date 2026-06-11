@@ -356,10 +356,13 @@ export interface UserInfo {
   id: number
   username: string
   display_name?: string
+  status?: number
+  role?: number
   quota: number
   used_quota: number
   request_count: number
   group?: string
+  api_request_log_enabled?: boolean
   aff_code?: string
   aff_count?: number
   aff_quota?: number

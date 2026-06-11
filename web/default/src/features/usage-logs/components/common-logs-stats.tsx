@@ -19,7 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import { useQuery } from '@tanstack/react-query'
 import { getRouteApi } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
-import { formatLogQuota } from '@/lib/format'
+import { formatLogQuota, formatTokens } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { useIsAdmin } from '@/hooks/use-admin'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -46,10 +46,10 @@ function StatBadge(props: {
   )
 }
 
-function formatStatNumber(value: number | undefined): string {
+function formatStatTokens(value: number | undefined): string {
   const numericValue = Number(value ?? 0)
-  if (!Number.isFinite(numericValue)) return '0'
-  return numericValue.toLocaleString()
+  if (!Number.isFinite(numericValue) || numericValue <= 0) return '0'
+  return formatTokens(numericValue)
 }
 
 export function CommonLogsStats() {
@@ -113,22 +113,22 @@ export function CommonLogsStats() {
       />
       <StatBadge
         label={t('Total Tokens')}
-        value={formatStatNumber(stats?.total_tokens)}
+        value={formatStatTokens(stats?.total_tokens)}
         accent='bg-emerald-500/70'
       />
       <StatBadge
         label={t('Input Tokens')}
-        value={formatStatNumber(stats?.input_tokens)}
+        value={formatStatTokens(stats?.input_tokens)}
         accent='bg-cyan-500/70'
       />
       <StatBadge
         label={t('Output Tokens')}
-        value={formatStatNumber(stats?.output_tokens)}
+        value={formatStatTokens(stats?.output_tokens)}
         accent='bg-amber-500/75'
       />
       <StatBadge
         label={t('Cache Tokens')}
-        value={formatStatNumber(stats?.cache_tokens)}
+        value={formatStatTokens(stats?.cache_tokens)}
         accent='bg-violet-500/70'
       />
     </div>
