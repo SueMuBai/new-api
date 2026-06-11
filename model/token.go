@@ -473,6 +473,50 @@ func BatchDeleteTokens(ids []int, userId int) (int, error) {
 	return len(tokens), nil
 }
 
+// DeleteAllTokensByUserIds 删除一组用户的所有令牌，返回每个用户被删除的令牌数量。
+func DeleteAllTokensByUserIds(userIds []int) (map[int]int, error) {
+	if len(userIds) == 0 {
+		return nil, errors.New("userIds 不能为空！")
+	}
+
+	tx := DB.Begin()
+
+	var tokens []Token
+	if err := tx.Select("id", "user_id", commonKeyCol).
+		Where("user_id IN ?", userIds).
+		Find(&tokens).Error; err != nil {
+		tx.Rollback()
+		return nil, err
+	}
+
+	if err := tx.Where("user_id IN ?", userIds).Delete(&Token{}).Error; err != nil {
+		tx.Rollback()
+		return nil, err
+	}
+
+	if err := tx.Commit().Error; err != nil {
+		return nil, err
+	}
+
+	counts := make(map[int]int, len(userIds))
+	for _, t := range tokens {
+		counts[t.UserId]++
+	}
+
+	if common.RedisEnabled {
+		gopool.Go(func() {
+			for _, t := range tokens {
+				if t.Key == "" {
+					continue
+				}
+				_ = cacheDeleteToken(t.Key)
+			}
+		})
+	}
+
+	return counts, nil
+}
+
 func GetTokenKeysByIds(ids []int, userId int) ([]Token, error) {
 	var tokens []Token
 	err := DB.Select("id", commonKeyCol).

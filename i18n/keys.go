@@ -37,6 +37,7 @@ const (
 	MsgAuthUserIdFormatError     = "auth.user_id_format_error"
 	MsgAuthUserIdMismatch        = "auth.user_id_mismatch"
 	MsgAuthUserBanned            = "auth.user_banned"
+	MsgAuthUserTokenSuspended    = "auth.user_token_suspended"
 	MsgAuthInsufficientPrivilege = "auth.insufficient_privilege"
 )
 
@@ -45,6 +46,7 @@ const (
 	MsgTokenNameTooLong          = "token.name_too_long"
 	MsgTokenQuotaNegative        = "token.quota_negative"
 	MsgTokenQuotaExceedMax       = "token.quota_exceed_max"
+	MsgTokenCreationSuspended    = "token.creation_suspended"
 	MsgTokenGenerateFailed       = "token.generate_failed"
 	MsgTokenGetInfoFailed        = "token.get_info_failed"
 	MsgTokenExpiredCannotEnable  = "token.expired_cannot_enable"

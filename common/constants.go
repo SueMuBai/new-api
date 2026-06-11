@@ -113,6 +113,7 @@ var DebugEnabled bool
 var MemoryCacheEnabled bool
 
 var LogConsumeEnabled = true
+var ApiRequestLogBodySizeKB = 64
 
 var TLSInsecureSkipVerify bool
 var InsecureTLSConfig = &tls.Config{InsecureSkipVerify: true}
@@ -232,9 +233,18 @@ var (
 var RateLimitKeyExpirationDuration = 20 * time.Minute
 
 const (
-	UserStatusEnabled  = 1 // don't use 0, 0 is the default value!
-	UserStatusDisabled = 2 // also don't use 0
+	UserStatusEnabled   = 1 // don't use 0, 0 is the default value!
+	UserStatusDisabled  = 2 // also don't use 0
+	UserStatusSuspended = 3 // API token access is suspended, dashboard access remains available.
 )
+
+func IsUserLoginAllowedStatus(status int) bool {
+	return status == UserStatusEnabled || status == UserStatusSuspended
+}
+
+func IsUserTokenUsableStatus(status int) bool {
+	return status == UserStatusEnabled
+}
 
 const (
 	TokenStatusEnabled   = 1 // don't use 0, 0 is the default value!

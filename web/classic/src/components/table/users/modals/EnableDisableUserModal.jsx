@@ -29,16 +29,27 @@ const EnableDisableUserModal = ({
   t,
 }) => {
   const isDisable = action === 'disable';
+  const isSuspend = action === 'suspend';
 
   return (
     <Modal
-      title={isDisable ? t('确定要禁用此用户吗？') : t('确定要启用此用户吗？')}
+      title={
+        isSuspend
+          ? t('确定要停用此用户的 API 使用吗？')
+          : isDisable
+            ? t('确定要禁用此用户吗？')
+            : t('确定要启用此用户吗？')
+      }
       visible={visible}
       onCancel={onCancel}
       onOk={onConfirm}
       type='warning'
     >
-      {isDisable ? t('此操作将禁用用户账户') : t('此操作将启用用户账户')}
+      {isSuspend
+        ? t('此操作会让用户已创建的令牌无法使用，登录和签到等后台功能不受影响')
+        : isDisable
+          ? t('此操作将禁用用户账户')
+          : t('此操作将启用用户账户')}
     </Modal>
   );
 };

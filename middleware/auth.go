@@ -120,7 +120,8 @@ func authHelper(c *gin.Context, minRole int) {
 		c.Abort()
 		return
 	}
-	if status.(int) == common.UserStatusDisabled {
+	userStatus, ok := status.(int)
+	if !ok || !common.IsUserLoginAllowedStatus(userStatus) {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
 			"message": common.TranslateMessage(c, i18n.MsgAuthUserBanned),
@@ -196,7 +197,7 @@ func TokenOrUserAuth() func(c *gin.Context) {
 		// Try session auth first (dashboard users)
 		session := sessions.Default(c)
 		if id := session.Get("id"); id != nil {
-			if status, ok := session.Get("status").(int); ok && status == common.UserStatusEnabled {
+			if status, ok := session.Get("status").(int); ok && common.IsUserLoginAllowedStatus(status) {
 				c.Set("id", id)
 				c.Next()
 				return
@@ -257,10 +258,14 @@ func TokenAuthReadOnly() func(c *gin.Context) {
 			c.Abort()
 			return
 		}
-		if userCache.Status != common.UserStatusEnabled {
+		if !common.IsUserTokenUsableStatus(userCache.Status) {
+			message := common.TranslateMessage(c, i18n.MsgAuthUserBanned)
+			if userCache.Status == common.UserStatusSuspended {
+				message = common.TranslateMessage(c, i18n.MsgAuthUserTokenSuspended)
+			}
 			c.JSON(http.StatusForbidden, gin.H{
 				"success": false,
-				"message": common.TranslateMessage(c, i18n.MsgAuthUserBanned),
+				"message": message,
 			})
 			c.Abort()
 			return
@@ -371,9 +376,12 @@ func TokenAuth() func(c *gin.Context) {
 				common.TranslateMessage(c, i18n.MsgDatabaseError))
 			return
 		}
-		userEnabled := userCache.Status == common.UserStatusEnabled
-		if !userEnabled {
-			abortWithOpenAiMessage(c, http.StatusForbidden, common.TranslateMessage(c, i18n.MsgAuthUserBanned))
+		if !common.IsUserTokenUsableStatus(userCache.Status) {
+			message := common.TranslateMessage(c, i18n.MsgAuthUserBanned)
+			if userCache.Status == common.UserStatusSuspended {
+				message = common.TranslateMessage(c, i18n.MsgAuthUserTokenSuspended)
+			}
+			abortWithOpenAiMessage(c, http.StatusForbidden, message)
 			return
 		}
 

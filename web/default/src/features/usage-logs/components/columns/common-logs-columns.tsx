@@ -96,6 +96,39 @@ function splitQuotaDisplay(value: string): { prefix: string; amount: string } {
   return { prefix: match[1], amount: match[2] }
 }
 
+function toTokenCount(value: number | null | undefined): number {
+  const parsed = Number(value ?? 0)
+  if (!Number.isFinite(parsed) || parsed <= 0) return 0
+  return parsed
+}
+
+function getLogTokenBreakdown(
+  log: UsageLog,
+  other: LogOtherData | null
+): {
+  inputTokens: number
+  outputTokens: number
+  cacheReadTokens: number
+  cacheWriteTokens: number
+} {
+  const inputTokens = toTokenCount(log.prompt_tokens)
+  const outputTokens = toTokenCount(log.completion_tokens)
+  const cacheReadTokens = toTokenCount(other?.cache_tokens)
+  const cacheWrite5m = toTokenCount(other?.cache_creation_tokens_5m)
+  const cacheWrite1h = toTokenCount(other?.cache_creation_tokens_1h)
+  const hasSplitCache = cacheWrite5m > 0 || cacheWrite1h > 0
+  const cacheWriteTokens = hasSplitCache
+    ? cacheWrite5m + cacheWrite1h
+    : toTokenCount(other?.cache_creation_tokens)
+
+  return {
+    inputTokens,
+    outputTokens,
+    cacheReadTokens,
+    cacheWriteTokens,
+  }
+}
+
 function buildDetailSegments(
   log: UsageLog,
   other: LogOtherData | null,
@@ -461,6 +494,32 @@ export function useCommonLogsColumns(isAdmin: boolean): ColumnDef<UsageLog>[] {
           )
         },
         meta: { label: t('User') },
+      },
+      {
+        accessorKey: 'ip',
+        header: ({ column }) => (
+          <DataTableColumnHeader column={column} title={t('IP')} />
+        ),
+        cell: function IpCell({ row }) {
+          const { sensitiveVisible } = useUsageLogsContext()
+          const ip = row.getValue('ip') as string
+
+          if (!ip) {
+            return <span className='text-muted-foreground text-xs'>-</span>
+          }
+
+          return (
+            <StatusBadge
+              label={sensitiveVisible ? ip : '••••'}
+              copyText={sensitiveVisible ? ip : undefined}
+              copyable={sensitiveVisible}
+              variant='neutral'
+              size='sm'
+              className='font-mono'
+            />
+          )
+        },
+        meta: { label: t('IP'), mobileHidden: true },
       }
     )
   }
@@ -668,26 +727,21 @@ export function useCommonLogsColumns(isAdmin: boolean): ColumnDef<UsageLog>[] {
         if (!isDisplayableLogType(log.type)) return null
 
         const other = parseLogOther(log.other)
-
-        const promptTokens = log.prompt_tokens || 0
-        const completionTokens = log.completion_tokens || 0
-        if (promptTokens === 0 && completionTokens === 0) {
+        const { inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens } =
+          getLogTokenBreakdown(log, other)
+        if (
+          inputTokens === 0 &&
+          outputTokens === 0 &&
+          cacheReadTokens === 0 &&
+          cacheWriteTokens === 0
+        ) {
           return <span className='text-muted-foreground text-xs'>-</span>
         }
-
-        const cacheReadTokens = other?.cache_tokens || 0
-        const cacheWrite5m = other?.cache_creation_tokens_5m || 0
-        const cacheWrite1h = other?.cache_creation_tokens_1h || 0
-        const hasSplitCache = cacheWrite5m > 0 || cacheWrite1h > 0
-        const cacheWriteTokens = hasSplitCache
-          ? cacheWrite5m + cacheWrite1h
-          : other?.cache_creation_tokens || 0
 
         return (
           <div className='flex flex-col gap-0.5'>
             <span className='font-mono text-xs font-medium tabular-nums'>
-              {promptTokens.toLocaleString()} /{' '}
-              {completionTokens.toLocaleString()}
+              {inputTokens.toLocaleString()} / {outputTokens.toLocaleString()}
             </span>
             {(cacheReadTokens > 0 || cacheWriteTokens > 0) && (
               <div className='flex items-center gap-1 text-[11px]'>
@@ -752,7 +806,7 @@ export function useCommonLogsColumns(isAdmin: boolean): ColumnDef<UsageLog>[] {
 
         return (
           <div className='flex flex-col gap-0.5'>
-            <span className='border-border/80 bg-muted/60 inline-flex h-6 w-fit items-center rounded-md border px-2 text-sm leading-none [font-family:var(--font-body)] font-semibold tabular-nums'>
+            <span className='border-border/80 bg-muted/60 inline-flex h-6 w-fit items-center rounded-md border px-2 [font-family:var(--font-body)] text-sm leading-none font-semibold tabular-nums'>
               {quotaDisplay.prefix && (
                 <span className='mr-1'>{quotaDisplay.prefix}</span>
               )}

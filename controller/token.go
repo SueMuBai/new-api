@@ -165,8 +165,20 @@ func GetTokenUsage(c *gin.Context) {
 }
 
 func AddToken(c *gin.Context) {
+	userId := c.GetInt("id")
+	userCache, err := model.GetUserCache(userId)
+	if err != nil {
+		common.SysLog(fmt.Sprintf("AddToken GetUserCache error for user %d: %v", userId, err))
+		common.ApiErrorI18n(c, i18n.MsgDatabaseError)
+		return
+	}
+	if !common.IsUserTokenUsableStatus(userCache.Status) {
+		common.ApiErrorI18n(c, i18n.MsgTokenCreationSuspended)
+		return
+	}
+
 	token := model.Token{}
-	err := c.ShouldBindJSON(&token)
+	err = c.ShouldBindJSON(&token)
 	if err != nil {
 		common.ApiError(c, err)
 		return
@@ -189,7 +201,7 @@ func AddToken(c *gin.Context) {
 	}
 	// 检查用户令牌数量是否已达上限
 	maxTokens := operation_setting.GetMaxUserTokens()
-	count, err := model.CountUserTokens(c.GetInt("id"))
+	count, err := model.CountUserTokens(userId)
 	if err != nil {
 		common.ApiError(c, err)
 		return
@@ -208,7 +220,7 @@ func AddToken(c *gin.Context) {
 		return
 	}
 	cleanToken := model.Token{
-		UserId:             c.GetInt("id"),
+		UserId:             userId,
 		Name:               token.Name,
 		Key:                key,
 		CreatedTime:        common.GetTimestamp(),
@@ -247,29 +259,45 @@ func DeleteToken(c *gin.Context) {
 	})
 }
 
-func UpdateToken(c *gin.Context) {
-	userId := c.GetInt("id")
-	statusOnly := c.Query("status_only")
-	token := model.Token{}
-	err := c.ShouldBindJSON(&token)
-	if err != nil {
-		common.ApiError(c, err)
-		return
-	}
+func validateTokenForUpdate(c *gin.Context, token model.Token) bool {
 	if len(token.Name) > 50 {
 		common.ApiErrorI18n(c, i18n.MsgTokenNameTooLong)
-		return
+		return false
 	}
 	if !token.UnlimitedQuota {
 		if token.RemainQuota < 0 {
 			common.ApiErrorI18n(c, i18n.MsgTokenQuotaNegative)
-			return
+			return false
 		}
 		maxQuotaValue := int((1000000000 * common.QuotaPerUnit))
 		if token.RemainQuota > maxQuotaValue {
 			common.ApiErrorI18n(c, i18n.MsgTokenQuotaExceedMax, map[string]any{"Max": maxQuotaValue})
-			return
+			return false
 		}
+	}
+	return true
+}
+
+func applyTokenUpdate(cleanToken *model.Token, token model.Token, statusOnly bool) {
+	if statusOnly {
+		cleanToken.Status = token.Status
+		return
+	}
+	// If you add more fields, please also update token.Update()
+	cleanToken.Name = token.Name
+	cleanToken.ExpiredTime = token.ExpiredTime
+	cleanToken.RemainQuota = token.RemainQuota
+	cleanToken.UnlimitedQuota = token.UnlimitedQuota
+	cleanToken.ModelLimitsEnabled = token.ModelLimitsEnabled
+	cleanToken.ModelLimits = token.ModelLimits
+	cleanToken.AllowIps = token.AllowIps
+	cleanToken.Group = token.Group
+	cleanToken.CrossGroupRetry = token.CrossGroupRetry
+}
+
+func updateUserToken(c *gin.Context, userId int, token model.Token, statusOnly bool) {
+	if !validateTokenForUpdate(c, token) {
+		return
 	}
 	cleanToken, err := model.GetTokenByIds(token.Id, userId)
 	if err != nil {
@@ -286,20 +314,7 @@ func UpdateToken(c *gin.Context) {
 			return
 		}
 	}
-	if statusOnly != "" {
-		cleanToken.Status = token.Status
-	} else {
-		// If you add more fields, please also update token.Update()
-		cleanToken.Name = token.Name
-		cleanToken.ExpiredTime = token.ExpiredTime
-		cleanToken.RemainQuota = token.RemainQuota
-		cleanToken.UnlimitedQuota = token.UnlimitedQuota
-		cleanToken.ModelLimitsEnabled = token.ModelLimitsEnabled
-		cleanToken.ModelLimits = token.ModelLimits
-		cleanToken.AllowIps = token.AllowIps
-		cleanToken.Group = token.Group
-		cleanToken.CrossGroupRetry = token.CrossGroupRetry
-	}
+	applyTokenUpdate(cleanToken, token, statusOnly)
 	err = cleanToken.Update()
 	if err != nil {
 		common.ApiError(c, err)
@@ -309,6 +324,98 @@ func UpdateToken(c *gin.Context) {
 		"success": true,
 		"message": "",
 		"data":    buildMaskedTokenResponse(cleanToken),
+	})
+}
+
+func UpdateToken(c *gin.Context) {
+	userId := c.GetInt("id")
+	statusOnly := c.Query("status_only")
+	token := model.Token{}
+	err := c.ShouldBindJSON(&token)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	updateUserToken(c, userId, token, statusOnly != "")
+}
+
+func GetUserTokensByAdmin(c *gin.Context) {
+	userId, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	pageInfo := common.GetPageQuery(c)
+	tokens, err := model.GetAllUserTokens(userId, pageInfo.GetStartIdx(), pageInfo.GetPageSize())
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	total, _ := model.CountUserTokens(userId)
+	pageInfo.SetTotal(int(total))
+	pageInfo.SetItems(buildMaskedTokenResponses(tokens))
+	common.ApiSuccess(c, pageInfo)
+}
+
+func GetUserTokenByAdmin(c *gin.Context) {
+	userId, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	tokenId, err := strconv.Atoi(c.Param("token_id"))
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	token, err := model.GetTokenByIds(tokenId, userId)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	common.ApiSuccess(c, buildMaskedTokenResponse(token))
+}
+
+func UpdateUserTokenByAdmin(c *gin.Context) {
+	userId, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	tokenId, err := strconv.Atoi(c.Param("token_id"))
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	statusOnly := c.Query("status_only")
+	token := model.Token{}
+	if err := common.DecodeJson(c.Request.Body, &token); err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	token.Id = tokenId
+	updateUserToken(c, userId, token, statusOnly != "")
+}
+
+func DeleteUserTokenByAdmin(c *gin.Context) {
+	userId, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	tokenId, err := strconv.Atoi(c.Param("token_id"))
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	err = model.DeleteTokenById(tokenId, userId)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "",
 	})
 }
 

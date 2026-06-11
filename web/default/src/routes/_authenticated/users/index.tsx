@@ -35,6 +35,16 @@ const usersSearchSchema = z.object({
     .optional()
     .catch([]),
   group: z.string().optional().catch(''),
+  usernameOp: z
+    .enum(['eq', 'ne', 'contains', 'not_contains'])
+    .optional()
+    .catch(undefined),
+  usernameValue: z.string().optional().catch(''),
+  quotaOp: z
+    .enum(['eq', 'ne', 'gt', 'gte', 'lt', 'lte'])
+    .optional()
+    .catch(undefined),
+  quotaValue: z.string().optional().catch(''),
 })
 
 export const Route = createFileRoute('/_authenticated/users/')({

@@ -55,6 +55,7 @@ export const userSchema = z.object({
   created_at: z.number().optional(),
   updated_at: z.number().optional(),
   last_login_at: z.number().optional(),
+  api_request_log_enabled: z.boolean().optional().default(false),
   DeletedAt: z.any().nullable().optional(),
   remark: z.string().optional(),
 })
@@ -94,9 +95,17 @@ export interface SearchUsersParams {
   group?: string
   role?: string
   status?: string
+  username_op?: UserTextFilterOperator
+  username_value?: string
+  quota_op?: UserNumberFilterOperator
+  quota_value?: string
   p?: number
   page_size?: number
 }
+
+export type UserTextFilterOperator = 'eq' | 'ne' | 'contains' | 'not_contains'
+
+export type UserNumberFilterOperator = 'eq' | 'ne' | 'gt' | 'gte' | 'lt' | 'lte'
 
 export interface UserFormData {
   username: string
@@ -113,16 +122,43 @@ export type ManageUserAction =
   | 'demote'
   | 'enable'
   | 'disable'
+  | 'suspend'
   | 'delete'
   | 'add_quota'
 
 export type QuotaAdjustMode = 'add' | 'subtract' | 'override'
+
+export type BatchManageUsersAction =
+  | 'enable'
+  | 'disable'
+  | 'suspend'
+  | 'delete_tokens'
+  | 'add_quota'
 
 export interface ManageUserQuotaPayload {
   id: number
   action: 'add_quota'
   mode: QuotaAdjustMode
   value: number
+}
+
+export interface BatchManageUsersPayload {
+  ids: number[]
+  action: BatchManageUsersAction
+  mode?: QuotaAdjustMode
+  value?: number
+}
+
+export interface BatchManageUserFailure {
+  id: number
+  message: string
+}
+
+export interface BatchManageUsersResult {
+  success_count: number
+  failed_count: number
+  token_deleted_count?: number
+  failures?: BatchManageUserFailure[]
 }
 
 // ============================================================================

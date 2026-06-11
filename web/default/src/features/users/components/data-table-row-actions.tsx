@@ -20,6 +20,7 @@ import { useState } from 'react'
 import { type Row } from '@tanstack/react-table'
 import {
   MoreHorizontal,
+  Ban,
   Pencil,
   Trash2,
   Power,
@@ -128,6 +129,7 @@ export function DataTableRowActions({ row }: DataTableRowActionsProps) {
   }
 
   const isDisabled = user.status === USER_STATUS.DISABLED
+  const isSuspended = user.status === USER_STATUS.SUSPENDED
   const isAdmin = user.role >= USER_ROLE.ADMIN
   const isRoot = user.role === USER_ROLE.ROOT
 
@@ -159,14 +161,28 @@ export function DataTableRowActions({ row }: DataTableRowActionsProps) {
 
           <DropdownMenuSeparator />
 
-          {isDisabled ? (
+          {(isDisabled || isSuspended) && (
             <DropdownMenuItem onClick={() => handleManage('enable')}>
               {t('Enable')}
               <DropdownMenuShortcut>
                 <Power size={16} />
               </DropdownMenuShortcut>
             </DropdownMenuItem>
-          ) : (
+          )}
+
+          {!isDisabled && !isSuspended && (
+            <DropdownMenuItem
+              onClick={() => handleManage('suspend')}
+              disabled={isRoot}
+            >
+              {t('Suspend API access')}
+              <DropdownMenuShortcut>
+                <Ban size={16} />
+              </DropdownMenuShortcut>
+            </DropdownMenuItem>
+          )}
+
+          {!isDisabled && (
             <DropdownMenuItem
               onClick={() => handleManage('disable')}
               disabled={isRoot}

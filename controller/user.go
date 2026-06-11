@@ -263,8 +263,26 @@ func SearchUsers(c *gin.Context) {
 			status = &parsed
 		}
 	}
+	var quotaValue *int
+	if quotaStr := c.Query("quota_value"); quotaStr != "" {
+		parsed, err := strconv.Atoi(quotaStr)
+		if err != nil {
+			common.ApiError(c, err)
+			return
+		}
+		quotaValue = &parsed
+	}
 	pageInfo := common.GetPageQuery(c)
-	users, total, err := model.SearchUsers(keyword, group, role, status, pageInfo.GetStartIdx(), pageInfo.GetPageSize())
+	users, total, err := model.SearchUsers(model.UserSearchOptions{
+		Keyword:          keyword,
+		Group:            group,
+		Role:             role,
+		Status:           status,
+		UsernameOperator: model.UserTextFilterOperator(c.Query("username_op")),
+		UsernameValue:    c.Query("username_value"),
+		QuotaOperator:    model.UserNumberFilterOperator(c.Query("quota_op")),
+		QuotaValue:       quotaValue,
+	}, pageInfo.GetStartIdx(), pageInfo.GetPageSize())
 	if err != nil {
 		common.ApiError(c, err)
 		return
@@ -871,12 +889,90 @@ type ManageRequest struct {
 	Mode   string `json:"mode"`
 }
 
+type BatchManageUsersRequest struct {
+	Ids    []int  `json:"ids"`
+	Action string `json:"action"`
+	Value  int    `json:"value"`
+	Mode   string `json:"mode"`
+}
+
+type BatchManageUserFailure struct {
+	Id      int    `json:"id"`
+	Message string `json:"message"`
+}
+
+type BatchManageUsersResult struct {
+	SuccessCount      int                      `json:"success_count"`
+	FailedCount       int                      `json:"failed_count"`
+	TokenDeletedCount int                      `json:"token_deleted_count,omitempty"`
+	Failures          []BatchManageUserFailure `json:"failures,omitempty"`
+}
+
+func uniquePositiveUserIds(ids []int) []int {
+	seen := make(map[int]struct{}, len(ids))
+	uniqueIds := make([]int, 0, len(ids))
+	for _, id := range ids {
+		if id <= 0 {
+			continue
+		}
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		uniqueIds = append(uniqueIds, id)
+	}
+	return uniqueIds
+}
+
+func invalidateManagedUserCaches(userId int) {
+	if err := model.InvalidateUserCache(userId); err != nil {
+		common.SysLog(fmt.Sprintf("failed to invalidate user cache for user %d: %s", userId, err.Error()))
+	}
+	if err := model.InvalidateUserTokensCache(userId); err != nil {
+		common.SysLog(fmt.Sprintf("failed to invalidate tokens cache for user %d: %s", userId, err.Error()))
+	}
+}
+
+func applyUserQuotaChange(c *gin.Context, user model.User, mode string, value int, adminInfo map[string]interface{}) error {
+	switch mode {
+	case "add":
+		if value <= 0 {
+			return errors.New(i18n.T(c, i18n.MsgUserQuotaChangeZero))
+		}
+		if err := model.IncreaseUserQuota(user.Id, value, true); err != nil {
+			return err
+		}
+		model.RecordLogWithAdminInfo(user.Id, model.LogTypeManage,
+			fmt.Sprintf("管理员增加用户额度 %s", logger.LogQuota(value)), adminInfo)
+	case "subtract":
+		if value <= 0 {
+			return errors.New(i18n.T(c, i18n.MsgUserQuotaChangeZero))
+		}
+		if err := model.DecreaseUserQuota(user.Id, value, true); err != nil {
+			return err
+		}
+		model.RecordLogWithAdminInfo(user.Id, model.LogTypeManage,
+			fmt.Sprintf("管理员减少用户额度 %s", logger.LogQuota(value)), adminInfo)
+	case "override":
+		oldQuota := user.Quota
+		if err := model.DB.Model(&model.User{}).Where("id = ?", user.Id).Update("quota", value).Error; err != nil {
+			return err
+		}
+		if err := model.InvalidateUserCache(user.Id); err != nil {
+			common.SysLog(fmt.Sprintf("failed to invalidate user cache for user %d: %s", user.Id, err.Error()))
+		}
+		model.RecordLogWithAdminInfo(user.Id, model.LogTypeManage,
+			fmt.Sprintf("管理员覆盖用户额度从 %s 为 %s", logger.LogQuota(oldQuota), logger.LogQuota(value)), adminInfo)
+	default:
+		return errors.New(i18n.T(c, i18n.MsgInvalidParams))
+	}
+	return nil
+}
+
 // ManageUser Only admin user can do this
 func ManageUser(c *gin.Context) {
 	var req ManageRequest
-	err := json.NewDecoder(c.Request.Body).Decode(&req)
-
-	if err != nil {
+	if err := common.DecodeJson(c.Request.Body, &req); err != nil {
 		common.ApiErrorI18n(c, i18n.MsgInvalidParams)
 		return
 	}
@@ -897,6 +993,12 @@ func ManageUser(c *gin.Context) {
 	switch req.Action {
 	case "disable":
 		user.Status = common.UserStatusDisabled
+		if user.Role == common.RoleRootUser {
+			common.ApiErrorI18n(c, i18n.MsgUserCannotDisableRootUser)
+			return
+		}
+	case "suspend":
+		user.Status = common.UserStatusSuspended
 		if user.Role == common.RoleRootUser {
 			common.ApiErrorI18n(c, i18n.MsgUserCannotDisableRootUser)
 			return
@@ -947,39 +1049,8 @@ func ManageUser(c *gin.Context) {
 			"admin_id":       adminId,
 			"admin_username": adminName,
 		}
-		switch req.Mode {
-		case "add":
-			if req.Value <= 0 {
-				common.ApiErrorI18n(c, i18n.MsgUserQuotaChangeZero)
-				return
-			}
-			if err := model.IncreaseUserQuota(user.Id, req.Value, true); err != nil {
-				common.ApiError(c, err)
-				return
-			}
-			model.RecordLogWithAdminInfo(user.Id, model.LogTypeManage,
-				fmt.Sprintf("管理员增加用户额度 %s", logger.LogQuota(req.Value)), adminInfo)
-		case "subtract":
-			if req.Value <= 0 {
-				common.ApiErrorI18n(c, i18n.MsgUserQuotaChangeZero)
-				return
-			}
-			if err := model.DecreaseUserQuota(user.Id, req.Value, true); err != nil {
-				common.ApiError(c, err)
-				return
-			}
-			model.RecordLogWithAdminInfo(user.Id, model.LogTypeManage,
-				fmt.Sprintf("管理员减少用户额度 %s", logger.LogQuota(req.Value)), adminInfo)
-		case "override":
-			oldQuota := user.Quota
-			if err := model.DB.Model(&model.User{}).Where("id = ?", user.Id).Update("quota", req.Value).Error; err != nil {
-				common.ApiError(c, err)
-				return
-			}
-			model.RecordLogWithAdminInfo(user.Id, model.LogTypeManage,
-				fmt.Sprintf("管理员覆盖用户额度从 %s 为 %s", logger.LogQuota(oldQuota), logger.LogQuota(req.Value)), adminInfo)
-		default:
-			common.ApiErrorI18n(c, i18n.MsgInvalidParams)
+		if err := applyUserQuotaChange(c, user, req.Mode, req.Value, adminInfo); err != nil {
+			common.ApiError(c, err)
 			return
 		}
 		c.JSON(http.StatusOK, gin.H{
@@ -987,23 +1058,21 @@ func ManageUser(c *gin.Context) {
 			"message": "",
 		})
 		return
+	default:
+		common.ApiErrorI18n(c, i18n.MsgInvalidParams)
+		return
 	}
 
 	if err := user.Update(false); err != nil {
 		common.ApiError(c, err)
 		return
 	}
-	// 禁用 / 角色调整后，强制失效用户缓存与其全部令牌缓存，
-	// 避免在 Redis TTL 过期前仍使用旧状态（尤其是禁用后仍可发起请求的问题）。
+	// 状态 / 角色调整后，强制失效用户缓存与其全部令牌缓存，
+	// 避免在 Redis TTL 过期前仍使用旧状态（尤其是停用或禁用后仍可发起请求的问题）。
 	// InvalidateUserCache 会让下一次 GetUserCache 从数据库重新加载，
 	// InvalidateUserTokensCache 则确保令牌侧的缓存也同步刷新。
-	if req.Action == "disable" || req.Action == "promote" || req.Action == "demote" {
-		if err := model.InvalidateUserCache(user.Id); err != nil {
-			common.SysLog(fmt.Sprintf("failed to invalidate user cache for user %d: %s", user.Id, err.Error()))
-		}
-		if err := model.InvalidateUserTokensCache(user.Id); err != nil {
-			common.SysLog(fmt.Sprintf("failed to invalidate tokens cache for user %d: %s", user.Id, err.Error()))
-		}
+	if req.Action == "disable" || req.Action == "suspend" || req.Action == "enable" || req.Action == "promote" || req.Action == "demote" {
+		invalidateManagedUserCaches(user.Id)
 	}
 	clearUser := model.User{
 		Role:   user.Role,
@@ -1015,6 +1084,128 @@ func ManageUser(c *gin.Context) {
 		"data":    clearUser,
 	})
 	return
+}
+
+// BatchManageUsers handles admin bulk actions for selected users.
+func BatchManageUsers(c *gin.Context) {
+	var req BatchManageUsersRequest
+	if err := common.DecodeJson(c.Request.Body, &req); err != nil {
+		common.ApiErrorI18n(c, i18n.MsgInvalidParams)
+		return
+	}
+
+	ids := uniquePositiveUserIds(req.Ids)
+	if len(ids) == 0 {
+		common.ApiErrorI18n(c, i18n.MsgInvalidParams)
+		return
+	}
+
+	switch req.Action {
+	case "enable", "disable", "suspend", "delete_tokens", "add_quota":
+	default:
+		common.ApiErrorI18n(c, i18n.MsgInvalidParams)
+		return
+	}
+
+	result := BatchManageUsersResult{}
+	addFailure := func(id int, message string) {
+		result.Failures = append(result.Failures, BatchManageUserFailure{
+			Id:      id,
+			Message: message,
+		})
+	}
+
+	myRole := c.GetInt("role")
+	adminName := c.GetString("username")
+	adminId := c.GetInt("id")
+	adminInfo := map[string]interface{}{
+		"admin_id":       adminId,
+		"admin_username": adminName,
+	}
+
+	users := make([]model.User, 0, len(ids))
+	for _, id := range ids {
+		user := model.User{Id: id}
+		model.DB.Unscoped().Where(&user).First(&user)
+		if user.Id == 0 {
+			addFailure(id, i18n.T(c, i18n.MsgUserNotExists))
+			continue
+		}
+		if !canManageTargetRole(myRole, user.Role) {
+			addFailure(id, i18n.T(c, i18n.MsgUserNoPermissionHigherLevel))
+			continue
+		}
+		if (req.Action == "disable" || req.Action == "suspend") && user.Role == common.RoleRootUser {
+			addFailure(id, i18n.T(c, i18n.MsgUserCannotDisableRootUser))
+			continue
+		}
+		users = append(users, user)
+	}
+
+	switch req.Action {
+	case "enable":
+		for _, user := range users {
+			user.Status = common.UserStatusEnabled
+			if err := user.Update(false); err != nil {
+				addFailure(user.Id, err.Error())
+				continue
+			}
+			invalidateManagedUserCaches(user.Id)
+			result.SuccessCount++
+		}
+	case "disable":
+		for _, user := range users {
+			user.Status = common.UserStatusDisabled
+			if err := user.Update(false); err != nil {
+				addFailure(user.Id, err.Error())
+				continue
+			}
+			invalidateManagedUserCaches(user.Id)
+			result.SuccessCount++
+		}
+	case "suspend":
+		for _, user := range users {
+			user.Status = common.UserStatusSuspended
+			if err := user.Update(false); err != nil {
+				addFailure(user.Id, err.Error())
+				continue
+			}
+			invalidateManagedUserCaches(user.Id)
+			result.SuccessCount++
+		}
+	case "delete_tokens":
+		userIds := make([]int, 0, len(users))
+		for _, user := range users {
+			userIds = append(userIds, user.Id)
+		}
+		if len(userIds) > 0 {
+			counts, err := model.DeleteAllTokensByUserIds(userIds)
+			if err != nil {
+				for _, user := range users {
+					addFailure(user.Id, err.Error())
+				}
+			} else {
+				for _, user := range users {
+					deletedCount := counts[user.Id]
+					result.TokenDeletedCount += deletedCount
+					model.RecordLogWithAdminInfo(user.Id, model.LogTypeManage,
+						fmt.Sprintf("管理员删除用户所有令牌 %d 个", deletedCount), adminInfo)
+					result.SuccessCount++
+				}
+			}
+		}
+	case "add_quota":
+		for _, user := range users {
+			if err := applyUserQuotaChange(c, user, req.Mode, req.Value, adminInfo); err != nil {
+				addFailure(user.Id, err.Error())
+				continue
+			}
+			result.SuccessCount++
+		}
+	}
+
+	result.FailedCount = len(result.Failures)
+	common.ApiSuccess(c, result)
 }
 
 type emailBindRequest struct {
@@ -1150,7 +1341,6 @@ type UpdateUserSettingRequest struct {
 	GotifyPriority                   int     `json:"gotify_priority,omitempty"`
 	UpstreamModelUpdateNotifyEnabled *bool   `json:"upstream_model_update_notify_enabled,omitempty"`
 	AcceptUnsetModelRatioModel       bool    `json:"accept_unset_model_ratio_model"`
-	RecordIpLog                      bool    `json:"record_ip_log"`
 }
 
 func UpdateUserSetting(c *gin.Context) {
@@ -1252,7 +1442,6 @@ func UpdateUserSetting(c *gin.Context) {
 		QuotaWarningThreshold:            req.QuotaWarningThreshold,
 		UpstreamModelUpdateNotifyEnabled: upstreamModelUpdateNotifyEnabled,
 		AcceptUnsetRatioModel:            req.AcceptUnsetModelRatioModel,
-		RecordIpLog:                      req.RecordIpLog,
 	}
 
 	// 如果是webhook类型,添加webhook相关设置

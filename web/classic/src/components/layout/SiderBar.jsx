@@ -39,6 +39,7 @@ const routerMap = {
   user: '/console/user',
   subscription: '/console/subscription',
   log: '/console/log',
+  api_request_logs: '/console/api-request-logs',
   midjourney: '/console/midjourney',
   setting: '/console/setting',
   about: '/about',
@@ -90,6 +91,12 @@ const SiderBar = ({ onNavigate = () => {} }) => {
         to: '/log',
       },
       {
+        text: t('API请求日志'),
+        itemKey: 'api_request_logs',
+        to: '/api-request-logs',
+        className: isRoot() ? '' : 'tableHiddle',
+      },
+      {
         text: t('绘图日志'),
         itemKey: 'midjourney',
         to: '/midjourney',
@@ -118,6 +125,7 @@ const SiderBar = ({ onNavigate = () => {} }) => {
     localStorage.getItem('enable_data_export'),
     localStorage.getItem('enable_drawing'),
     localStorage.getItem('enable_task'),
+    isRoot(),
     t,
     isModuleVisible,
   ]);

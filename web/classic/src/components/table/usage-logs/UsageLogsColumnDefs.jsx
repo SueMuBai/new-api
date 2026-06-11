@@ -144,10 +144,7 @@ function renderType(type, t) {
 
 function buildStreamStatusTooltip(ss, t) {
   if (!ss) return null;
-  const lines = [
-    t('流状态') + '：' + t('异常'),
-    (ss.end_reason || 'unknown'),
-  ];
+  const lines = [t('流状态') + '：' + t('异常'), ss.end_reason || 'unknown'];
   if (ss.error_count > 0) {
     lines.push(`${t('软错误')}: ${ss.error_count}`);
   }
@@ -185,11 +182,7 @@ function renderIsStream(bool, t, streamStatus) {
                 userSelect: 'none',
               }}
             >
-              <CircleAlert
-                size={14}
-                strokeWidth={2.5}
-                color='currentColor'
-              />
+              <CircleAlert size={14} strokeWidth={2.5} color='currentColor' />
             </span>
           </Tooltip>
         )}
@@ -370,6 +363,35 @@ function getPromptCacheSummary(other) {
   };
 }
 
+function getCacheTokenCount(other) {
+  const cacheSummary = getPromptCacheSummary(other);
+  return (
+    (cacheSummary?.cacheReadTokens || 0) + (cacheSummary?.cacheWriteTokens || 0)
+  );
+}
+
+function isTokenUsageLog(record) {
+  return [0, 2, 5, 6].includes(record?.type);
+}
+
+function renderTokenCountCell(value, record) {
+  if (!isTokenUsageLog(record)) {
+    return <></>;
+  }
+
+  const tokens = toTokenNumber(value);
+  return tokens > 0 ? <span>{formatTokenCount(tokens)}</span> : <span>-</span>;
+}
+
+function getTotalTokenCount(record) {
+  const other = getLogOther(record.other);
+  return (
+    toTokenNumber(record.prompt_tokens) +
+    toTokenNumber(record.completion_tokens) +
+    getCacheTokenCount(other)
+  );
+}
+
 function normalizeDetailText(detail) {
   return String(detail || '')
     .replace(/\n\r/g, '\n')
@@ -461,7 +483,11 @@ function getUsageLogDetailSummary(record, text, billingDisplayMode, t) {
     };
   }
 
-  const summaryOpts = { ...other, displayMode: billingDisplayMode, outputMode: 'segments' };
+  const summaryOpts = {
+    ...other,
+    displayMode: billingDisplayMode,
+    outputMode: 'segments',
+  };
 
   if (other?.billing_mode === 'tiered_expr') {
     return { segments: renderTieredModelPriceSimple(summaryOpts) };
@@ -830,26 +856,44 @@ export const getLogsColumns = ({
       },
     },
     {
+      key: COLUMN_KEYS.TOKEN_TOTAL,
+      title: t('Token 总量'),
+      dataIndex: 'token_total',
+      render: (text, record, index) => {
+        return renderTokenCountCell(getTotalTokenCount(record), record);
+      },
+    },
+    {
+      key: COLUMN_KEYS.INPUT_TOKENS,
+      title: t('输入 Token 数'),
+      dataIndex: 'prompt_tokens',
+      render: (text, record, index) => {
+        return renderTokenCountCell(text, record);
+      },
+    },
+    {
+      key: COLUMN_KEYS.OUTPUT_TOKENS,
+      title: t('输出 Token 数'),
+      dataIndex: 'completion_tokens',
+      render: (text, record, index) => {
+        return renderTokenCountCell(text, record);
+      },
+    },
+    {
+      key: COLUMN_KEYS.CACHE_TOKENS,
+      title: t('缓存 Tokens'),
+      dataIndex: 'cache_tokens',
+      render: (text, record, index) => {
+        const other = getLogOther(record.other);
+        return renderTokenCountCell(getCacheTokenCount(other), record);
+      },
+    },
+    {
       key: COLUMN_KEYS.IP,
-      title: (
-        <div className='flex items-center gap-1'>
-          {t('IP')}
-          <Tooltip
-            content={t(
-              '只有当用户设置开启IP记录时，才会进行请求和错误类型日志的IP记录',
-            )}
-          >
-            <IconHelpCircle className='text-gray-400 cursor-help' />
-          </Tooltip>
-        </div>
-      ),
+      title: t('IP'),
       dataIndex: 'ip',
       render: (text, record, index) => {
-        const showIp =
-          (record.type === 2 ||
-            record.type === 5 ||
-            (isAdminUser && record.type === 1)) &&
-          text;
+        const showIp = isAdminUser && text;
         return showIp ? (
           <Tooltip content={text}>
             <span>

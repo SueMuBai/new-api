@@ -131,9 +131,17 @@ func SetApiRouter(router *gin.Engine) {
 				adminRoute.GET("/topup", controller.GetAllTopUps)
 				adminRoute.POST("/topup/complete", controller.AdminCompleteTopUp)
 				adminRoute.GET("/search", controller.SearchUsers)
+				adminRoute.POST("/batch", controller.BatchManageUsers)
 				adminRoute.GET("/:id/oauth/bindings", controller.GetUserOAuthBindingsByAdmin)
 				adminRoute.DELETE("/:id/oauth/bindings/:provider_id", controller.UnbindCustomOAuthByAdmin)
 				adminRoute.DELETE("/:id/bindings/:binding_type", controller.AdminClearUserBinding)
+				adminRoute.GET("/:id/groups", controller.GetUserGroups)
+				adminRoute.GET("/:id/models", controller.GetUserModels)
+				adminRoute.GET("/:id/tokens", controller.GetUserTokensByAdmin)
+				adminRoute.GET("/:id/tokens/:token_id", controller.GetUserTokenByAdmin)
+				adminRoute.PUT("/:id/tokens/:token_id", controller.UpdateUserTokenByAdmin)
+				adminRoute.DELETE("/:id/tokens/:token_id", controller.DeleteUserTokenByAdmin)
+				adminRoute.PUT("/:id/api-request-log", middleware.RootAuth(), controller.UpdateUserApiRequestLog)
 				adminRoute.GET("/:id", controller.GetUser)
 				adminRoute.POST("/", controller.CreateUser)
 				adminRoute.POST("/manage", controller.ManageUser)
@@ -312,6 +320,14 @@ func SetApiRouter(router *gin.Engine) {
 		logRoute.GET("/search", middleware.AdminAuth(), controller.SearchAllLogs)
 		logRoute.GET("/self", middleware.UserAuth(), controller.GetUserLogs)
 		logRoute.GET("/self/search", middleware.UserAuth(), middleware.SearchRateLimit(), controller.SearchUserLogs)
+
+		apiRequestLogRoute := apiRouter.Group("/api_request_logs")
+		apiRequestLogRoute.Use(middleware.RootAuth())
+		{
+			apiRequestLogRoute.GET("/", controller.GetApiRequestLogs)
+			apiRequestLogRoute.GET("/:log_id", controller.GetApiRequestLog)
+			apiRequestLogRoute.DELETE("/", controller.DeleteApiRequestLogs)
+		}
 
 		dataRoute := apiRouter.Group("/data")
 		dataRoute.GET("/", middleware.AdminAuth(), controller.GetAllQuotaDates)

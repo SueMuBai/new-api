@@ -18,10 +18,14 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { type ColumnDef } from '@tanstack/react-table'
 import { useTranslation } from 'react-i18next'
+import { toast } from 'sonner'
 import { formatQuota, formatTimestamp } from '@/lib/format'
+import { ROLE } from '@/lib/roles'
 import { cn } from '@/lib/utils'
+import { useAuthStore } from '@/stores/auth-store'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Progress } from '@/components/ui/progress'
+import { Switch } from '@/components/ui/switch'
 import {
   Tooltip,
   TooltipContent,
@@ -34,7 +38,9 @@ import { StatusBadge } from '@/components/status-badge'
 import { TableId } from '@/components/table-id'
 import { USER_STATUSES, USER_ROLES, isUserDeleted } from '../constants'
 import { type User } from '../types'
+import { updateUserApiRequestLog } from '../api'
 import { DataTableRowActions } from './data-table-row-actions'
+import { useUsers } from './users-provider'
 
 function getQuotaProgressColor(percentage: number): string {
   if (percentage <= 10) return '[&_[data-slot=progress-indicator]]:bg-rose-500'
@@ -44,6 +50,11 @@ function getQuotaProgressColor(percentage: number): string {
 
 export function useUsersColumns(): ColumnDef<User>[] {
   const { t } = useTranslation()
+  const currentUserRole =
+    useAuthStore((state) => state.auth.user?.role) ?? ROLE.GUEST
+  const isSuperAdmin = currentUserRole === ROLE.SUPER_ADMIN
+  const { triggerRefresh } = useUsers()
+
   return [
     {
       id: 'select',
@@ -52,7 +63,7 @@ export function useUsersColumns(): ColumnDef<User>[] {
           checked={table.getIsAllPageRowsSelected()}
           indeterminate={table.getIsSomePageRowsSelected()}
           onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
-          aria-label='Select all'
+          aria-label={t('Select current page')}
           className='translate-y-[2px]'
         />
       ),
@@ -160,6 +171,68 @@ export function useUsersColumns(): ColumnDef<User>[] {
       enableSorting: false,
       meta: { label: t('Status'), mobileBadge: true },
     },
+    ...(isSuperAdmin
+      ? [
+          {
+            accessorKey: 'api_request_log_enabled',
+            header: ({ column }) => (
+              <DataTableColumnHeader
+                column={column}
+                title={t('API Logging')}
+              />
+            ),
+            cell: ({ row }) => {
+              const user = row.original
+              const enabled = Boolean(user.api_request_log_enabled)
+
+              const handleChange = async (checked: boolean) => {
+                try {
+                  const result = await updateUserApiRequestLog(user.id, checked)
+                  if (!result.success) {
+                    throw new Error(
+                      result.message || t('Failed to update API logging')
+                    )
+                  }
+                  toast.success(
+                    checked
+                      ? t('API logging enabled')
+                      : t('API logging disabled')
+                  )
+                } catch (error) {
+                  const message =
+                    error instanceof Error
+                      ? error.message
+                      : t('Failed to update API logging')
+                  toast.error(message)
+                } finally {
+                  triggerRefresh()
+                }
+              }
+
+              return (
+                <div
+                  className='flex min-w-[120px] items-center gap-2'
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  <Switch
+                    checked={enabled}
+                    disabled={isUserDeleted(user)}
+                    onCheckedChange={handleChange}
+                    aria-label={t('Toggle API request logging')}
+                  />
+                  <StatusBadge
+                    label={enabled ? t('Enabled') : t('Disabled')}
+                    variant={enabled ? 'success' : 'neutral'}
+                    copyable={false}
+                  />
+                </div>
+              )
+            },
+            enableSorting: false,
+            meta: { label: t('API Logging'), mobileHidden: true },
+          } satisfies ColumnDef<User>,
+        ]
+      : []),
     {
       id: 'quota',
       accessorKey: 'quota',

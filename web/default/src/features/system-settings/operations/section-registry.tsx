@@ -25,6 +25,7 @@ import { PerformanceSection } from '../maintenance/performance-section'
 import { UpdateCheckerSection } from '../maintenance/update-checker-section'
 import type { OperationsSettings } from '../types'
 import { createSectionRegistry } from '../utils/section-registry'
+import { ApiRequestLogsSection } from './api-request-logs-section'
 
 const OPERATIONS_SECTIONS = [
   {
@@ -100,6 +101,15 @@ const OPERATIONS_SECTIONS = [
     build: (settings: OperationsSettings) => (
       <LogSettingsSection
         defaultEnabled={Boolean(settings.LogConsumeEnabled)}
+      />
+    ),
+  },
+  {
+    id: 'api-request-logs',
+    titleKey: 'API Request Logs',
+    build: (settings: OperationsSettings) => (
+      <ApiRequestLogsSection
+        defaultBodySizeKB={settings.ApiRequestLogBodySizeKB}
       />
     ),
   },

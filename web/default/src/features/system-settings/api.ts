@@ -18,8 +18,12 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { api } from '@/lib/api'
 import type {
+  DeleteApiRequestLogsResponse,
   ConfirmPaymentComplianceResponse,
   DeleteLogsResponse,
+  GetApiRequestLogResponse,
+  GetApiRequestLogsParams,
+  GetApiRequestLogsResponse,
   FetchUpstreamRatiosRequest,
   SystemOptionsResponse,
   UpdateOptionRequest,
@@ -50,6 +54,31 @@ export async function deleteLogsBefore(targetTimestamp: number) {
   const res = await api.delete<DeleteLogsResponse>('/api/log/', {
     params: { target_timestamp: targetTimestamp },
   })
+  return res.data
+}
+
+export async function getApiRequestLogs(params: GetApiRequestLogsParams = {}) {
+  const res = await api.get<GetApiRequestLogsResponse>(
+    '/api/api_request_logs/',
+    { params }
+  )
+  return res.data
+}
+
+export async function getApiRequestLog(logId: number) {
+  const res = await api.get<GetApiRequestLogResponse>(
+    `/api/api_request_logs/${logId}`
+  )
+  return res.data
+}
+
+export async function deleteApiRequestLogsBefore(targetTimestamp: number) {
+  const res = await api.delete<DeleteApiRequestLogsResponse>(
+    '/api/api_request_logs/',
+    {
+      params: { target_timestamp: targetTimestamp },
+    }
+  )
   return res.data
 }
 

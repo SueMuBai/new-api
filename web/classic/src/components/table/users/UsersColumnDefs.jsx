@@ -27,6 +27,7 @@ import {
   Popover,
   Typography,
   Dropdown,
+  Switch,
 } from '@douyinfe/semi-ui';
 import { IconMore } from '@douyinfe/semi-icons';
 import {
@@ -34,6 +35,7 @@ import {
   renderNumber,
   renderQuota,
   timestamp2string,
+  isRoot,
 } from '../../../helpers';
 
 const renderTimestamp = (text) => (text ? timestamp2string(text) : '-');
@@ -117,6 +119,9 @@ const renderStatistics = (text, record, showEnableDisableModal, t) => {
   } else if (record.status === 2) {
     tagColor = 'red';
     tagText = t('已禁用');
+  } else if (record.status === 3) {
+    tagColor = 'orange';
+    tagText = t('停用');
   }
 
   const content = (
@@ -200,6 +205,27 @@ const renderInviteInfo = (text, record, t) => {
   );
 };
 
+const renderApiRequestLogSwitch = (record, updateUserApiRequestLog, t) => {
+  if (record.DeletedAt !== null) {
+    return '-';
+  }
+  return (
+    <Space spacing={4}>
+      <Switch
+        size='small'
+        checked={Boolean(record.api_request_log_enabled)}
+        onChange={(checked) => updateUserApiRequestLog(record.id, checked)}
+      />
+      <Tag
+        color={record.api_request_log_enabled ? 'green' : 'grey'}
+        shape='circle'
+      >
+        {record.api_request_log_enabled ? t('已开启') : t('已关闭')}
+      </Tag>
+    </Space>
+  );
+};
+
 /**
  * Render operations column
  */
@@ -255,6 +281,15 @@ const renderOperations = (
 
   return (
     <Space>
+      {record.status === 1 && (
+        <Button
+          type='warning'
+          size='small'
+          onClick={() => showEnableDisableModal(record, 'suspend')}
+        >
+          {t('停用')}
+        </Button>
+      )}
       {record.status === 1 ? (
         <Button
           type='danger'
@@ -316,8 +351,9 @@ export const getUsersColumns = ({
   showResetPasskeyModal,
   showResetTwoFAModal,
   showUserSubscriptionsModal,
+  updateUserApiRequestLog,
 }) => {
-  return [
+  const columns = [
     {
       title: 'ID',
       dataIndex: 'id',
@@ -333,6 +369,16 @@ export const getUsersColumns = ({
       render: (text, record, index) =>
         renderStatistics(text, record, showEnableDisableModal, t),
     },
+    ...(isRoot()
+      ? [
+          {
+            title: t('API日志'),
+            dataIndex: 'api_request_log_enabled',
+            render: (text, record) =>
+              renderApiRequestLogSwitch(record, updateUserApiRequestLog, t),
+          },
+        ]
+      : []),
     {
       title: t('剩余额度/总额度'),
       key: 'quota_usage',
@@ -387,4 +433,6 @@ export const getUsersColumns = ({
         }),
     },
   ];
+
+  return columns;
 };

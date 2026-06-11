@@ -46,6 +46,7 @@ const DEFAULT_SIDEBAR_MODULES: SidebarModulesAdminConfig = {
     detail: true,
     token: true,
     log: true,
+    api_request_logs: true,
     midjourney: true,
     task: true,
   },
@@ -115,6 +116,12 @@ const URL_TO_CONFIG_MAP: Record<string, { section: string; module: string }> = {
   '/subscriptions': { section: 'admin', module: 'subscription' },
   '/system-settings': { section: 'admin', module: 'setting' },
   '/system-settings/site': { section: 'admin', module: 'setting' },
+  '/system-settings/auth': { section: 'admin', module: 'setting' },
+  '/system-settings/security': { section: 'admin', module: 'setting' },
+  '/system-settings/content': { section: 'admin', module: 'setting' },
+  '/system-settings/models': { section: 'admin', module: 'setting' },
+  '/system-settings/billing': { section: 'admin', module: 'setting' },
+  '/system-settings/operations': { section: 'admin', module: 'setting' },
 }
 
 /**
@@ -169,7 +176,11 @@ function isModuleEnabled(
   adminConfig: SidebarModulesAdminConfig,
   userConfig: SidebarModulesUserConfig
 ): boolean {
-  const mapping = URL_TO_CONFIG_MAP[url]
+  const mapping =
+    URL_TO_CONFIG_MAP[url] ??
+    Object.entries(URL_TO_CONFIG_MAP)
+      .sort(([a], [b]) => b.length - a.length)
+      .find(([path]) => url.startsWith(`${path}/`))?.[1]
   if (!mapping) {
     // No mapping config, default to visible (e.g. system settings and new features)
     return true

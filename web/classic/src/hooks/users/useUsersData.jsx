@@ -120,7 +120,7 @@ export const useUsersData = () => {
     setSearching(false);
   };
 
-  // Manage user operations (promote, demote, enable, disable, delete)
+  // Manage user operations (promote, demote, enable, disable, suspend, delete)
   const manageUser = async (userId, action, record) => {
     // Trigger loading state to force table re-render
     setLoading(true);
@@ -185,6 +185,32 @@ export const useUsersData = () => {
       }
     } catch (error) {
       showError(t('操作失败，请重试'));
+    }
+  };
+
+  const updateUserApiRequestLog = async (userId, enabled) => {
+    setLoading(true);
+    try {
+      const res = await API.put(`/api/user/${userId}/api-request-log`, {
+        enabled,
+      });
+      const { success, message } = res.data;
+      if (success) {
+        showSuccess(enabled ? t('API日志已开启') : t('API日志已关闭'));
+        setUsers((currentUsers) =>
+          currentUsers.map((user) =>
+            user.id === userId
+              ? { ...user, api_request_log_enabled: enabled }
+              : user,
+          ),
+        );
+      } else {
+        showError(message || t('操作失败，请重试'));
+      }
+    } catch (error) {
+      showError(t('操作失败，请重试'));
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -307,6 +333,7 @@ export const useUsersData = () => {
     manageUser,
     resetUserPasskey,
     resetUserTwoFA,
+    updateUserApiRequestLog,
     handlePageChange,
     handlePageSizeChange,
     handleRow,

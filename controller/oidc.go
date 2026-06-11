@@ -171,7 +171,7 @@ func OidcAuth(c *gin.Context) {
 		}
 	}
 
-	if user.Status != common.UserStatusEnabled {
+	if !common.IsUserLoginAllowedStatus(user.Status) {
 		c.JSON(http.StatusOK, gin.H{
 			"message": "用户已被封禁",
 			"success": false,

@@ -198,6 +198,10 @@ export interface LogStatistics {
   quota: number
   rpm: number
   tpm: number
+  total_tokens: number
+  input_tokens: number
+  output_tokens: number
+  cache_tokens: number
 }
 
 // ============================================================================
@@ -236,6 +240,7 @@ export interface TaskLog {
   id: number
   user_id: number
   username?: string
+  ip?: string
   platform: string // suno, kling, runway, etc.
   task_id: string
   action: string // MUSIC, LYRICS, GENERATE, TEXT_GENERATE, etc.

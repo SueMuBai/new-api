@@ -34,6 +34,9 @@ type DataTableBulkActionsProps<TData> = {
   table: Table<TData>
   entityName: string
   children: React.ReactNode
+  selectedCount?: number
+  selectionLabel?: React.ReactNode
+  onClearSelection?: () => void
 }
 
 /**
@@ -50,10 +53,13 @@ export function DataTableBulkActions<TData>({
   table,
   entityName,
   children,
+  selectedCount: selectedCountProp,
+  selectionLabel,
+  onClearSelection,
 }: DataTableBulkActionsProps<TData>): React.ReactNode | null {
   const { t } = useTranslation()
   const selectedRows = table.getFilteredSelectedRowModel().rows
-  const selectedCount = selectedRows.length
+  const selectedCount = selectedCountProp ?? selectedRows.length
   const toolbarRef = useRef<HTMLDivElement>(null)
   const [announcement, setAnnouncement] = useState('')
 
@@ -71,6 +77,10 @@ export function DataTableBulkActions<TData>({
   }, [selectedCount, entityName])
 
   const handleClearSelection = () => {
+    if (onClearSelection) {
+      onClearSelection()
+      return
+    }
     table.resetRowSelection()
   }
 
@@ -211,11 +221,15 @@ export function DataTableBulkActions<TData>({
             >
               {selectedCount}
             </Badge>{' '}
-            <span className='hidden sm:inline'>
-              {entityName}
-              {selectedCount > 1 ? 's' : ''}
-            </span>{' '}
-            {t('selected')}
+            {selectionLabel ?? (
+              <>
+                <span className='hidden sm:inline'>
+                  {entityName}
+                  {selectedCount > 1 ? 's' : ''}
+                </span>{' '}
+                {t('selected')}
+              </>
+            )}
           </div>
 
           <Separator

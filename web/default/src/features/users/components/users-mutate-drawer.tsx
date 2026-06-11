@@ -73,6 +73,7 @@ import {
 } from '../lib'
 import { type User } from '../types'
 import { UserQuotaDialog } from './user-quota-dialog'
+import { UserTokensPanel } from './user-tokens-panel'
 import { useUsers } from './users-provider'
 
 type UsersMutateDrawerProps = {
@@ -414,6 +415,12 @@ export function UsersMutateDrawer({
                       </FormItem>
                     )}
                   />
+                </SideDrawerSection>
+              )}
+
+              {isUpdate && currentRow && (
+                <SideDrawerSection>
+                  <UserTokensPanel userId={currentRow.id} />
                 </SideDrawerSection>
               )}
 

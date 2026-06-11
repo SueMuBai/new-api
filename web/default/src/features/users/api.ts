@@ -17,6 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { api } from '@/lib/api'
+import type { ApiKey, ApiKeyFormData, GetApiKeysResponse } from '../keys/types'
 import type {
   User,
   GetUsersParams,
@@ -25,6 +26,8 @@ import type {
   UserFormData,
   ManageUserAction,
   ManageUserQuotaPayload,
+  BatchManageUsersPayload,
+  BatchManageUsersResult,
   ApiResponse,
 } from './types'
 
@@ -54,6 +57,10 @@ export async function searchUsers(
     group = '',
     role = '',
     status = '',
+    username_op,
+    username_value = '',
+    quota_op,
+    quota_value = '',
     p = 1,
     page_size = 10,
   } = params
@@ -62,6 +69,14 @@ export async function searchUsers(
   queryParams.set('group', group)
   if (role) queryParams.set('role', role)
   if (status) queryParams.set('status', status)
+  if (username_op && username_value.trim()) {
+    queryParams.set('username_op', username_op)
+    queryParams.set('username_value', username_value.trim())
+  }
+  if (quota_op && quota_value.trim()) {
+    queryParams.set('quota_op', quota_op)
+    queryParams.set('quota_value', quota_value.trim())
+  }
   queryParams.set('p', String(p))
   queryParams.set('page_size', String(page_size))
   const res = await api.get(`/api/user/search?${queryParams.toString()}`)
@@ -105,7 +120,7 @@ export async function deleteUser(id: number): Promise<ApiResponse> {
 }
 
 /**
- * Manage user (promote, demote, enable, disable, delete)
+ * Manage user (promote, demote, enable, disable, suspend, delete)
  */
 export async function manageUser(
   id: number,
@@ -122,6 +137,24 @@ export async function adjustUserQuota(
   payload: ManageUserQuotaPayload
 ): Promise<ApiResponse<Partial<User>>> {
   const res = await api.post('/api/user/manage', payload)
+  return res.data
+}
+
+export async function updateUserApiRequestLog(
+  userId: number,
+  enabled: boolean
+): Promise<ApiResponse<{ enabled: boolean }>> {
+  const res = await api.put(`/api/user/${userId}/api-request-log`, { enabled })
+  return res.data
+}
+
+/**
+ * Batch manage selected users.
+ */
+export async function batchManageUsers(
+  payload: BatchManageUsersPayload
+): Promise<ApiResponse<BatchManageUsersResult>> {
+  const res = await api.post('/api/user/batch', payload)
   return res.data
 }
 
@@ -146,6 +179,57 @@ export async function resetUserTwoFA(id: number): Promise<ApiResponse> {
  */
 export async function getGroups(): Promise<ApiResponse<string[]>> {
   const res = await api.get('/api/group/')
+  return res.data
+}
+
+export async function getUserGroupsByAdmin(
+  userId: number
+): Promise<
+  ApiResponse<Record<string, { desc: string; ratio: number | string }>>
+> {
+  const res = await api.get(`/api/user/${userId}/groups`, {
+    params: { _t: Date.now() },
+    disableDuplicate: true,
+  })
+  return res.data
+}
+
+export async function getUserModelsByAdmin(
+  userId: number
+): Promise<ApiResponse<string[]>> {
+  const res = await api.get(`/api/user/${userId}/models`, {
+    params: { _t: Date.now() },
+    disableDuplicate: true,
+  })
+  return res.data
+}
+
+export async function getUserApiKeys(
+  userId: number,
+  params: { p?: number; size?: number } = {}
+): Promise<GetApiKeysResponse> {
+  const { p = 1, size = 10 } = params
+  const res = await api.get(`/api/user/${userId}/tokens`, {
+    params: { p, size, _t: Date.now() },
+    disableDuplicate: true,
+  })
+  return res.data
+}
+
+export async function updateUserApiKey(
+  userId: number,
+  tokenId: number,
+  data: ApiKeyFormData
+): Promise<ApiResponse<ApiKey>> {
+  const res = await api.put(`/api/user/${userId}/tokens/${tokenId}`, data)
+  return res.data
+}
+
+export async function deleteUserApiKey(
+  userId: number,
+  tokenId: number
+): Promise<ApiResponse> {
+  const res = await api.delete(`/api/user/${userId}/tokens/${tokenId}`)
   return res.data
 }
 

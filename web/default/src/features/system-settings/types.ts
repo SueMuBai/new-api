@@ -56,6 +56,70 @@ export type DeleteLogsResponse = {
   data?: number
 }
 
+export type ApiRequestLog = {
+  id: number
+  log_id: number
+  created_at: number
+  user_id: number
+  username: string
+  token_id: number
+  token_name: string
+  model_name: string
+  channel_id: number
+  method: string
+  path: string
+  query: string
+  status_code: number
+  ip: string
+  use_time: number
+  is_stream: boolean
+  request_id?: string
+  upstream_request_id?: string
+  request_body: string
+  response_body: string
+  request_truncated?: boolean
+  response_truncated?: boolean
+}
+
+export type GetApiRequestLogsParams = {
+  p?: number
+  page_size?: number
+  user_id?: string
+  username?: string
+  token_name?: string
+  model_name?: string
+  channel_id?: string
+  path?: string
+  status_code?: string
+  request_id?: string
+  upstream_request_id?: string
+  start_timestamp?: number
+  end_timestamp?: number
+}
+
+export type GetApiRequestLogsResponse = {
+  success: boolean
+  message: string
+  data?: {
+    items: ApiRequestLog[]
+    total: number
+    page: number
+    page_size: number
+  }
+}
+
+export type GetApiRequestLogResponse = {
+  success: boolean
+  message: string
+  data?: ApiRequestLog
+}
+
+export type DeleteApiRequestLogsResponse = {
+  success: boolean
+  message: string
+  data?: number
+}
+
 export type SiteSettings = {
   'theme.frontend': string
   Notice: string
@@ -294,6 +358,7 @@ export type OperationsSettings = {
   WorkerValidKey: string
   WorkerAllowHttpImageRequestEnabled: boolean
   LogConsumeEnabled: boolean
+  ApiRequestLogBodySizeKB: number
   'performance_setting.disk_cache_enabled': boolean
   'performance_setting.disk_cache_threshold_mb': number
   'performance_setting.disk_cache_max_size_mb': number

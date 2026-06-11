@@ -19,51 +19,84 @@ import (
 
 const UserNameMaxLength = 20
 
+type UserTextFilterOperator string
+
+const (
+	UserTextFilterEqual       UserTextFilterOperator = "eq"
+	UserTextFilterNotEqual    UserTextFilterOperator = "ne"
+	UserTextFilterContains    UserTextFilterOperator = "contains"
+	UserTextFilterNotContains UserTextFilterOperator = "not_contains"
+)
+
+type UserNumberFilterOperator string
+
+const (
+	UserNumberFilterEqual              UserNumberFilterOperator = "eq"
+	UserNumberFilterNotEqual           UserNumberFilterOperator = "ne"
+	UserNumberFilterGreaterThan        UserNumberFilterOperator = "gt"
+	UserNumberFilterGreaterThanOrEqual UserNumberFilterOperator = "gte"
+	UserNumberFilterLessThan           UserNumberFilterOperator = "lt"
+	UserNumberFilterLessThanOrEqual    UserNumberFilterOperator = "lte"
+)
+
+type UserSearchOptions struct {
+	Keyword          string
+	Group            string
+	Role             *int
+	Status           *int
+	UsernameOperator UserTextFilterOperator
+	UsernameValue    string
+	QuotaOperator    UserNumberFilterOperator
+	QuotaValue       *int
+}
+
 // User if you add sensitive fields, don't forget to clean them in setupLogin function.
 // Otherwise, the sensitive information will be saved on local storage in plain text!
 type User struct {
-	Id               int            `json:"id"`
-	Username         string         `json:"username" gorm:"unique;index" validate:"max=20"`
-	Password         string         `json:"password" gorm:"not null;" validate:"min=8,max=20"`
-	OriginalPassword string         `json:"original_password" gorm:"-:all"` // this field is only for Password change verification, don't save it to database!
-	DisplayName      string         `json:"display_name" gorm:"index" validate:"max=20"`
-	Role             int            `json:"role" gorm:"type:int;default:1"`   // admin, common
-	Status           int            `json:"status" gorm:"type:int;default:1"` // enabled, disabled
-	Email            string         `json:"email" gorm:"index" validate:"max=50"`
-	GitHubId         string         `json:"github_id" gorm:"column:github_id;index"`
-	DiscordId        string         `json:"discord_id" gorm:"column:discord_id;index"`
-	OidcId           string         `json:"oidc_id" gorm:"column:oidc_id;index"`
-	WeChatId         string         `json:"wechat_id" gorm:"column:wechat_id;index"`
-	TelegramId       string         `json:"telegram_id" gorm:"column:telegram_id;index"`
-	VerificationCode string         `json:"verification_code" gorm:"-:all"`                         // this field is only for Email verification, don't save it to database!
-	AccessToken      *string        `json:"-" gorm:"type:char(32);column:access_token;uniqueIndex"` // this token is for system management
-	Quota            int            `json:"quota" gorm:"type:int;default:0"`
-	UsedQuota        int            `json:"used_quota" gorm:"type:int;default:0;column:used_quota"` // used quota
-	RequestCount     int            `json:"request_count" gorm:"type:int;default:0;"`               // request number
-	Group            string         `json:"group" gorm:"type:varchar(64);default:'default'"`
-	AffCode          string         `json:"aff_code" gorm:"type:varchar(32);column:aff_code;uniqueIndex"`
-	AffCount         int            `json:"aff_count" gorm:"type:int;default:0;column:aff_count"`
-	AffQuota         int            `json:"aff_quota" gorm:"type:int;default:0;column:aff_quota"`           // 邀请剩余额度
-	AffHistoryQuota  int            `json:"aff_history_quota" gorm:"type:int;default:0;column:aff_history"` // 邀请历史额度
-	InviterId        int            `json:"inviter_id" gorm:"type:int;column:inviter_id;index"`
-	DeletedAt        gorm.DeletedAt `gorm:"index"`
-	LinuxDOId        string         `json:"linux_do_id" gorm:"column:linux_do_id;index"`
-	Setting          string         `json:"setting" gorm:"type:text;column:setting"`
-	Remark           string         `json:"remark,omitempty" gorm:"type:varchar(255)" validate:"max=255"`
-	StripeCustomer   string         `json:"stripe_customer" gorm:"type:varchar(64);column:stripe_customer;index"`
-	CreatedAt        int64          `json:"created_at" gorm:"autoCreateTime;column:created_at"`
-	LastLoginAt      int64          `json:"last_login_at" gorm:"default:0;column:last_login_at"`
+	Id                   int            `json:"id"`
+	Username             string         `json:"username" gorm:"unique;index" validate:"max=20"`
+	Password             string         `json:"password" gorm:"not null;" validate:"min=8,max=20"`
+	OriginalPassword     string         `json:"original_password" gorm:"-:all"` // this field is only for Password change verification, don't save it to database!
+	DisplayName          string         `json:"display_name" gorm:"index" validate:"max=20"`
+	Role                 int            `json:"role" gorm:"type:int;default:1"`   // admin, common
+	Status               int            `json:"status" gorm:"type:int;default:1"` // enabled, disabled
+	Email                string         `json:"email" gorm:"index" validate:"max=50"`
+	GitHubId             string         `json:"github_id" gorm:"column:github_id;index"`
+	DiscordId            string         `json:"discord_id" gorm:"column:discord_id;index"`
+	OidcId               string         `json:"oidc_id" gorm:"column:oidc_id;index"`
+	WeChatId             string         `json:"wechat_id" gorm:"column:wechat_id;index"`
+	TelegramId           string         `json:"telegram_id" gorm:"column:telegram_id;index"`
+	VerificationCode     string         `json:"verification_code" gorm:"-:all"`                         // this field is only for Email verification, don't save it to database!
+	AccessToken          *string        `json:"-" gorm:"type:char(32);column:access_token;uniqueIndex"` // this token is for system management
+	Quota                int            `json:"quota" gorm:"type:int;default:0"`
+	UsedQuota            int            `json:"used_quota" gorm:"type:int;default:0;column:used_quota"` // used quota
+	RequestCount         int            `json:"request_count" gorm:"type:int;default:0;"`               // request number
+	Group                string         `json:"group" gorm:"type:varchar(64);default:'default'"`
+	AffCode              string         `json:"aff_code" gorm:"type:varchar(32);column:aff_code;uniqueIndex"`
+	AffCount             int            `json:"aff_count" gorm:"type:int;default:0;column:aff_count"`
+	AffQuota             int            `json:"aff_quota" gorm:"type:int;default:0;column:aff_quota"`           // 邀请剩余额度
+	AffHistoryQuota      int            `json:"aff_history_quota" gorm:"type:int;default:0;column:aff_history"` // 邀请历史额度
+	InviterId            int            `json:"inviter_id" gorm:"type:int;column:inviter_id;index"`
+	DeletedAt            gorm.DeletedAt `gorm:"index"`
+	LinuxDOId            string         `json:"linux_do_id" gorm:"column:linux_do_id;index"`
+	Setting              string         `json:"setting" gorm:"type:text;column:setting"`
+	Remark               string         `json:"remark,omitempty" gorm:"type:varchar(255)" validate:"max=255"`
+	StripeCustomer       string         `json:"stripe_customer" gorm:"type:varchar(64);column:stripe_customer;index"`
+	CreatedAt            int64          `json:"created_at" gorm:"autoCreateTime;column:created_at"`
+	LastLoginAt          int64          `json:"last_login_at" gorm:"default:0;column:last_login_at"`
+	ApiRequestLogEnabled bool           `json:"api_request_log_enabled" gorm:"default:false;column:api_request_log_enabled"`
 }
 
 func (user *User) ToBaseUser() *UserBase {
 	cache := &UserBase{
-		Id:       user.Id,
-		Group:    user.Group,
-		Quota:    user.Quota,
-		Status:   user.Status,
-		Username: user.Username,
-		Setting:  user.Setting,
-		Email:    user.Email,
+		Id:                   user.Id,
+		Group:                user.Group,
+		Quota:                user.Quota,
+		Status:               user.Status,
+		Username:             user.Username,
+		Setting:              user.Setting,
+		Email:                user.Email,
+		ApiRequestLogEnabled: user.ApiRequestLogEnabled,
 	}
 	return cache
 }
@@ -225,7 +258,65 @@ func GetAllUsers(pageInfo *common.PageInfo) (users []*User, total int64, err err
 	return users, total, nil
 }
 
-func SearchUsers(keyword string, group string, role *int, status *int, startIdx int, num int) ([]*User, int64, error) {
+func escapeUserLikeLiteral(input string) string {
+	input = strings.ReplaceAll(input, "!", "!!")
+	input = strings.ReplaceAll(input, "%", "!%")
+	input = strings.ReplaceAll(input, "_", "!_")
+	return input
+}
+
+func applyUserTextFilter(tx *gorm.DB, column string, operator UserTextFilterOperator, value string) (*gorm.DB, error) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return tx, nil
+	}
+	if operator == "" {
+		operator = UserTextFilterEqual
+	}
+
+	switch operator {
+	case UserTextFilterEqual:
+		return tx.Where(column+" = ?", value), nil
+	case UserTextFilterNotEqual:
+		return tx.Where(column+" <> ?", value), nil
+	case UserTextFilterContains:
+		pattern := "%" + escapeUserLikeLiteral(value) + "%"
+		return tx.Where(column+" LIKE ? ESCAPE '!'", pattern), nil
+	case UserTextFilterNotContains:
+		pattern := "%" + escapeUserLikeLiteral(value) + "%"
+		return tx.Where(column+" NOT LIKE ? ESCAPE '!'", pattern), nil
+	default:
+		return nil, fmt.Errorf("invalid text filter operator: %s", operator)
+	}
+}
+
+func applyUserNumberFilter(tx *gorm.DB, column string, operator UserNumberFilterOperator, value *int) (*gorm.DB, error) {
+	if value == nil {
+		return tx, nil
+	}
+	if operator == "" {
+		operator = UserNumberFilterEqual
+	}
+
+	switch operator {
+	case UserNumberFilterEqual:
+		return tx.Where(column+" = ?", *value), nil
+	case UserNumberFilterNotEqual:
+		return tx.Where(column+" <> ?", *value), nil
+	case UserNumberFilterGreaterThan:
+		return tx.Where(column+" > ?", *value), nil
+	case UserNumberFilterGreaterThanOrEqual:
+		return tx.Where(column+" >= ?", *value), nil
+	case UserNumberFilterLessThan:
+		return tx.Where(column+" < ?", *value), nil
+	case UserNumberFilterLessThanOrEqual:
+		return tx.Where(column+" <= ?", *value), nil
+	default:
+		return nil, fmt.Errorf("invalid number filter operator: %s", operator)
+	}
+}
+
+func SearchUsers(options UserSearchOptions, startIdx int, num int) ([]*User, int64, error) {
 	var users []*User
 	var total int64
 	var err error
@@ -245,26 +336,38 @@ func SearchUsers(keyword string, group string, role *int, status *int, startIdx 
 	query := tx.Unscoped().Model(&User{})
 
 	// 构建搜索条件
-	likeCondition := "username LIKE ? OR email LIKE ? OR display_name LIKE ?"
-	likeArgs := []interface{}{"%" + keyword + "%", "%" + keyword + "%", "%" + keyword + "%"}
+	keyword := strings.TrimSpace(options.Keyword)
+	if keyword != "" {
+		likeCondition := "username LIKE ? OR email LIKE ? OR display_name LIKE ? OR remark LIKE ?"
+		likeArgs := []interface{}{"%" + keyword + "%", "%" + keyword + "%", "%" + keyword + "%", "%" + keyword + "%"}
 
-	// 尝试将关键字转换为整数ID
-	keywordInt, err := strconv.Atoi(keyword)
-	if err == nil {
-		// 如果是数字，同时搜索ID和其他字段
-		likeCondition = "id = ? OR " + likeCondition
-		likeArgs = append([]interface{}{keywordInt}, likeArgs...)
+		// 尝试将关键字转换为整数ID
+		keywordInt, err := strconv.Atoi(keyword)
+		if err == nil {
+			// 如果是数字，同时搜索ID和其他字段
+			likeCondition = "id = ? OR " + likeCondition
+			likeArgs = append([]interface{}{keywordInt}, likeArgs...)
+		}
+
+		query = query.Where("("+likeCondition+")", likeArgs...)
 	}
 
-	query = query.Where("("+likeCondition+")", likeArgs...)
-	if group != "" {
-		query = query.Where(commonGroupCol+" = ?", group)
+	if options.Group != "" {
+		query = query.Where(commonGroupCol+" = ?", options.Group)
 	}
-	if role != nil {
-		query = query.Where("role = ?", *role)
+	if options.Role != nil {
+		query = query.Where("role = ?", *options.Role)
 	}
-	if status != nil {
-		query = query.Where("status = ?", *status)
+	if options.Status != nil {
+		query = query.Where("status = ?", *options.Status)
+	}
+	if query, err = applyUserTextFilter(query, "username", options.UsernameOperator, options.UsernameValue); err != nil {
+		tx.Rollback()
+		return nil, 0, err
+	}
+	if query, err = applyUserNumberFilter(query, "quota", options.QuotaOperator, options.QuotaValue); err != nil {
+		tx.Rollback()
+		return nil, 0, err
 	}
 
 	// 获取总数
@@ -608,7 +711,7 @@ func (user *User) ValidateAndFill() (err error) {
 		return fmt.Errorf("%w: %v", ErrDatabase, err)
 	}
 	okay := common.ValidatePasswordAndHash(password, user.Password)
-	if !okay || user.Status != common.UserStatusEnabled {
+	if !okay || !common.IsUserLoginAllowedStatus(user.Status) {
 		return ErrInvalidCredentials
 	}
 	return nil
