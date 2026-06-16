@@ -30,6 +30,10 @@ import { SettingsPageTitleStatusPortal } from '../components/settings-page-conte
 import { SettingsSection } from '../components/settings-section'
 import { useUpdateOption } from '../hooks/use-update-option'
 import { GroupRatioForm } from './group-ratio-form'
+import {
+  ModelPricingCoverageOperations,
+  type ModelPricingCoverageValues,
+} from './model-pricing-coverage-operations'
 import { ModelRatioForm } from './model-ratio-form'
 import { ToolPriceSettings } from './tool-price-settings'
 import { UpstreamRatioSync } from './upstream-ratio-sync'
@@ -128,7 +132,13 @@ const createGroupSchema = (t: Translate) =>
 
 type ModelFormValues = z.infer<ReturnType<typeof createModelSchema>>
 type GroupFormValues = z.infer<ReturnType<typeof createGroupSchema>>
-type RatioTabId = 'models' | 'groups' | 'tool-prices' | 'upstream-sync'
+type RatioTabId =
+  | 'models'
+  | 'groups'
+  | 'tool-prices'
+  | 'upstream-sync'
+  | 'missing-pricing'
+  | 'unused-pricing'
 
 type RatioSettingsCardProps = {
   modelDefaults: ModelFormValues
@@ -373,6 +383,23 @@ export function RatioSettingsCard({
     [updateOption]
   )
 
+  const commitModelPricingValues = useCallback(
+    async (values: ModelPricingCoverageValues) => {
+      const currentValues = modelForm.getValues()
+      for (const key of Object.keys(currentValues) as Array<
+        keyof ModelFormValues
+      >) {
+        modelForm.setValue(key, values[key], {
+          shouldDirty: true,
+          shouldValidate: true,
+        })
+      }
+
+      await saveModelRatios(values)
+    },
+    [modelForm, saveModelRatios]
+  )
+
   const handleResetRatios = useCallback(() => {
     setConfirmOpen(true)
   }, [])
@@ -387,6 +414,8 @@ export function RatioSettingsCard({
     groups: 'Group ratios',
     'tool-prices': 'Tool prices',
     'upstream-sync': 'Upstream price sync',
+    'missing-pricing': 'Missing model pricing',
+    'unused-pricing': 'Unused model pricing',
   }
   const tabsGridClass =
     {
@@ -394,7 +423,7 @@ export function RatioSettingsCard({
       2: 'grid-cols-2',
       3: 'grid-cols-3',
       4: 'grid-cols-4',
-    }[visibleTabs.length] ?? 'grid-cols-4'
+    }[visibleTabs.length] ?? 'grid-flow-col auto-cols-max overflow-x-auto'
   const defaultTab = visibleTabs[0] ?? 'models'
 
   const renderTabContent = (tab: RatioTabId) => {
@@ -421,6 +450,16 @@ export function RatioSettingsCard({
     }
     if (tab === 'tool-prices') {
       return <ToolPriceSettings defaultValue={toolPricesDefault} />
+    }
+    if (tab === 'missing-pricing' || tab === 'unused-pricing') {
+      return (
+        <ModelPricingCoverageOperations
+          mode={tab}
+          values={modelForm.watch()}
+          onCommit={commitModelPricingValues}
+          isSaving={updateOption.isPending}
+        />
+      )
     }
     return (
       <UpstreamRatioSync
